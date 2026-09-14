@@ -64,10 +64,57 @@ typedef enum {
 /*
  *
  * 2. LIMPEZA DE ENTRADA (ESPAÇOS E COMENTÁRIOS)
- * [ ] Implementar a lógica de leitura avançando caractere por caractere.
- * [ ] Descartar espaços em branco, tabulações e quebras de linha (incrementando o contador de linha ao detectar '\n').
- * [ ] Descartar comentários: ao identificar '//', ignorar todos os caracteres seguintes até encontrar uma quebra de linha.
+ * [X] Implementar a lógica de leitura avançando caractere por caractere.
+ * [X] Descartar espaços em branco, tabulações e quebras de linha (incrementando o contador de linha ao detectar '\n').
+ * [X] Descartar comentários: ao identificar '//', ignorar todos os caracteres seguintes até encontrar uma quebra de linha.
  */
+
+ int peek() { // A função peek espia o próximo caractere sem consumi-lo do buffer
+    int c = fgetc(fonte); // tal que c representa um charactere lido do arquivo fonte e o fgetc() lê o próximo caractere do arquivo fonte e retorna seu valor como um inteiro
+    if (c != EOF) { 
+        ungetc(c, fonte); // ele devolve o caractere lido para o fluxo
+    }
+    return c;
+ }
+
+ //Limpeza de Entrada
+ Token proximoToken() {
+    Token token;
+    int c;
+    int i = 0;
+
+    while((c =fgetc(fonte)) != EOF) { // Laço contínuo para ignorar espaços em branco e comentários
+        
+        if(c == '\n') { //Controle de linha do programa fonte
+            linhaAtual++;
+        }
+
+        if (isspace(c)) { // identifica espaços em branco, tabulações e quebras de linha
+            continue; //pula para a próxima iteração do laço
+        }
+
+        //Identificação de comentários usando o peek
+        if(c == '/' && peek() == '/') {
+            while((c = fgetc(fonte)) != EOF && c != '\n'); // ignora todos os caracteres até encontrar uma quebra de linha
+            
+            if(c == '\n') { 
+                linhaAtual++; // Incrementa o contador de linha ao detectar '\n'
+            }
+            continue; //Volta para o inicio do laço para continuar a leitura
+    }   
+    
+    // Se o caractere não for espaço em branco, tabulação, quebra de linha ou comentário, ele é parte de um token válido
+    break;
+ }
+
+ if (c == EOF) { // Se o final do arquivo for atingido, retorna um token de fim de arquivo
+    token.type = TOKEN_EOF;
+    token.line = linhaAtual;
+    return token;
+ }
+
+ return token; // Retorna o token válido encontrado
+ }
 
 /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
  * [ ] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
