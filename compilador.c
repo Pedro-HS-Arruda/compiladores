@@ -21,7 +21,6 @@ typedef enum {
        atribuicao, operadores aritmeticos e delimitadores, que nao apareciam
        no modelo de token da Figura 2. */
     TOKEN_CADEIA,
-    TOKEN_ATRIB,
     TOKEN_OP_ARIT,
     TOKEN_DELIM
 } TokenNome;
@@ -242,7 +241,7 @@ Token obterToken(void) {
         int prox = peek();
         if (prox == '-') {
             fgetc(fonte);
-            token.type = TOKEN_ATRIB;
+            token.type = TOKEN_OP_REL;
             return token;
         }
         if (prox == '=') {
