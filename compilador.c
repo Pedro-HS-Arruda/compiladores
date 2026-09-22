@@ -313,13 +313,28 @@ Token obterToken(void) {
 
     return token; // inalcancavel (erroLexico sempre sai), mas exigido pelo compilador
 }
+void registrar_token(Token t, FILE *arquivo_log){
+    const char *nome_tipo;
+    switch (t.type){
+        case TOKEN_KEYWORD: nome_tipo = "PALAVRA_RESERVADA"; break;
+        case TOKEN_ID: nome_tipo = "IDENTIFICADOR"; break;
+        case TOKEN_NUM_INT: nome_tipo = "NUMERO"; break;
+        default: nome_tipo = "DESCONHECIDO"; break;
+    }
+    //imprime no formato correto
+    printf("Linha# %d %s | %s\n", t.line, nome_tipo, nome_tipo);
+    //grava a saída no arquivo de saída no formato correto
+    if(arquivo_log != NULL){
+        fprintf(arquivo_log, "Linha# %d | %s\n", t.line, nome_tipo);
+    }
+}
 
+    
 /* ===================== main() de teste =====================
  * Temporario, so para voce conseguir compilar e ver os tokens saindo.
  * NAO e o item 5 (formatacao "linha# TOKEN | atributo" + arquivo de log)
  * nem o item 6 completo -- so o suficiente para validar o item 3 agora.
  */
-<<<<<<< HEAD
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
@@ -339,24 +354,6 @@ int main(int argc, char *argv[]) {
         t = obterToken();
         printf("linha %d -> type=%d\n", t.line, t.type); // saida crua, so para testar
     } while (t.type != TOKEN_EOF);
-=======
-  void registrar_token(Token t, FILE *arquivo_log){
-        const char *nome_tipo;
-        switch (t.type){
-            case TOKEN_KEYWORD: nome_tipo = "PALAVRA_RESERVADA"; break;
-            case TOKEN_ID: nome_tipo = "IDENTIFICADOR"; break;
-            case TOKEN_NUM_INT: nome_tipo = "NUMERO"; break;
-            default: nome_tipo = "DESCONHECIDO"; break;
-        }
-        //imprime no formato correto
-        printf("Linha# %d %s | %s\n", t.line, nome_tipo, nome_tipo);
-        //grava a saída no arquivo de saída no formato correto
-        if(arquivo_log != NULL){
-            fprintf(arquivo_log, "Linha# %d %s | %s\n", t.line, nome_tipo);
-        }
-    }
->>>>>>> 379838878faa5f4230eaccc60a29c86c945c2e3f
-
     fecharAnalisador();
     return 0;
 }
