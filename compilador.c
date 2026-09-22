@@ -342,3 +342,78 @@ void erroLexico(const char *sequencia) {
     fecharAnalisador();
     exit(1);
 }
+
+
+
+/* TODO LIST - ETAPA 3: ANALISADOR SINTATICO (MINIVISUALG)
+
+1. INTEGRACAO COM O ANALISADOR LEXICO
+[ ] Criar a variavel/estrutura que guarda o "token atual" (o lookahead do parser).
+[ ] Implementar a funcao nextToken() do lado do sintatico, que chama obterToken()
+    do lexico e atualiza o token atual (nomes sugeridos pela professora na Figura 1).
+[ ] Antes de comecar a analise, chamar nextToken() uma vez para carregar o
+    primeiro token do arquivo.
+
+2. FUNCOES AUXILIARES DE APOIO AO PARSER
+[ ] Criar uma funcao que confere se o token atual e do tipo esperado e, se for,
+    avanca para o proximo (senao, aciona o erro sintatico).
+[ ] Criar uma funcao que confere se o token atual e uma palavra reservada
+    especifica (ex: "se", "enquanto", "fimalgoritmo").
+[ ] Criar uma funcao que confere se o token atual e um delimitador ou operador
+    especifico (ex: '(', ')', ':', ',').
+
+3. IMPLEMENTACAO DA GRAMATICA - ESTRUTURA GERAL
+[ ] algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
+[ ] declaracao -> declaracao_var | declaracao_procedimento | declaracao_funcao
+
+4. IMPLEMENTACAO DA GRAMATICA - DECLARACOES
+[ ] declaracao_var -> var declaracao_lista+
+[ ] declaracao_lista -> id_lista ':' tipo
+[ ] id_lista -> id (',' id)*
+[ ] tipo -> tipo_base | vetor '[' num_int '..' num_int ']' de tipo_base
+[ ] tipo_base -> inteiro | real | caractere | logico
+[ ] declaracao_procedimento -> procedimento id ('(' parametros ')')? inicio comando* fimprocedimento
+[ ] declaracao_funcao -> funcao id '(' parametros? ')' ':' tipo_base inicio comando* fimfuncao
+[ ] parametros -> parametro (',' parametro)*
+[ ] parametro -> id ':' tipo_base
+
+5. IMPLEMENTACAO DA GRAMATICA - COMANDOS
+[ ] comando -> atribuicao | leitura | escrita | condicional
+             | repeticao_para | repeticao_enquanto | chamada | retorno
+[ ] atribuicao -> variavel '<-' expressao
+[ ] variavel -> id ('[' expressao ']')?
+[ ] leitura -> leia '(' variavel ')'
+[ ] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
+[ ] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
+[ ] repeticao_para -> para id de expressao ate expressao (passo expressao)? faca comando* fimpara
+[ ] repeticao_enquanto -> enquanto '(' expressao ')' faca comando* fimenquanto
+[ ] chamada -> id ('(' (expressao (',' expressao)*)? ')')?
+[ ] retorno -> retorne expressao
+[ ] Decidir como diferenciar atribuicao de chamada quando os dois comecam com
+    id (olhar o que vem depois do id: '<-', '[', '(' ou nenhum desses).
+
+6. IMPLEMENTACAO DA GRAMATICA - EXPRESSOES
+[ ] expressao -> expressao_e (OU expressao_e)*
+[ ] expressao_e -> expressao_rel (E expressao_rel)*
+[ ] expressao_rel -> expressao_arit (opReal expressao_arit)?
+[ ] expressao_arit -> termo (('+' | '-') termo)*
+[ ] termo -> fator (('*' | '/' | '\' | MOD) fator)*
+[ ] fator -> '(' expressao ')'
+           | '-' fator
+           | id ('[' expressao ']' | '(' (expressao (',' expressao)*)? ')')?
+           | num_int | num_real | cadeia | verdadeiro | falso
+
+7. TRATAMENTO DE ERROS SINTATICOS
+[ ] Interceptar qualquer token que nao bata com o que a gramatica esperava
+    naquele ponto da analise.
+[ ] Exibir a mensagem exata "ERRO SINTATICO", informando o token incorreto e
+    a linha do codigo fonte correspondente.
+[ ] Abortar imediatamente a execucao do programa (exit) apos identificar o erro.
+
+8. INTEGRACAO FINAL E ENTREGA
+[ ] Garantir que o analisador lexico e o sintatico rodem juntos, no mesmo
+    programa (o enunciado exige a entrega dos dois funcionando em conjunto).
+[ ] Testar contra os proprios exemplos do Anexo I fornecidos pela professora.
+[ ] Utilizar os nomes de modulos sugeridos no documento (nextToken / obterToken).
+
+*/
