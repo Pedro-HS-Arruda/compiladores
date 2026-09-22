@@ -269,6 +269,21 @@ int inserirTabelaSimbolos(const char *lexema) {
  * [ ] Imprimir cada token no terminal (stdout) à medida que são reconhecidos.
  * [ ] Gravar a mesma saída formatada em um arquivo de texto de log.
  */
+  void registrar_token(Token t, FILE *arquivo_log){
+        const char *nome_tipo;
+        switch (t.type){
+            case TOKEN_KEYWORD: nome_tipo = "PALAVRA_RESERVADA"; break;
+            case TOKEN_ID: nome_tipo = "IDENTIFICADOR"; break;
+            case TOKEN_NUM_INT: nome_tipo = "NUMERO"; break;
+            default: nome_tipo = "DESCONHECIDO"; break;
+        }
+        //imprime no formato correto
+        printf("Linha# %d %s | %s\n", t.line, nome_tipo, nome_tipo);
+        //grava a saída no arquivo de saída no formato correto
+        if(arquivo_log != NULL){
+            fprintf(arquivo_log, "Linha# %d %s | %s\n", t.line, nome_tipo);
+        }
+    }
 
 /* 6. TRATAMENTO DE ERROS LÉXICOS
  * [ ] Interceptar qualquer caractere lido que não pertença ao alfabeto/regras da linguagem MiniVisualg.
