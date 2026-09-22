@@ -3,6 +3,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#define MAX_LEXEMA 128
+
 typedef struct {
     TokenNome type; //Nome do token
     int line; // Para tratamento de erros
@@ -114,7 +116,9 @@ typedef enum {
  }
 
  return token; // Retorna o token válido encontrado
- }
+ 
+ 
+ token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
 
 /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
  * [ ] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
@@ -123,11 +127,109 @@ typedef enum {
  * [ ] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
  */
 
+ if (isalpha(c) || c == '_') {
+        char lexema[MAX_LEXEMA];
+        int i = 0;
+        lexema[i++] = (char)c;
+ 
+        while (i < MAX_LEXEMA - 1 && (isalnum(peek()) || peek() == '_')) {
+            lexema[i++] = (char)fgetc(fonte);
+        }
+        lexema[i] = '\0';
+ 
+        token.type = classificarPalavra(lexema);
+        if (token.type == TOKEN_ID) {
+            token.attribute.table_index = inserirTabelaSimbolos(lexema);
+        }
+        return token;
+    }
+ 
+    if (isdigit(c)) {
+        char lexema[MAX_LEXEMA];
+        int i = 0;
+        int ehReal = 0;
+        lexema[i++] = (char)c;
+ 
+        while (i < MAX_LEXEMA - 1 && isdigit(peek())) {
+            lexema[i++] = (char)fgetc(fonte);
+        }
+ 
+        if (peek() == '.') {
+            ehReal = 1;
+            lexema[i++] = (char)fgetc(fonte);
+ 
+            if (!isdigit(peek())) {
+                lexema[i] = '\0';
+                erroLexico(lexema);
+            }
+            while (i < MAX_LEXEMA - 1 && isdigit(peek())) {
+                lexema[i++] = (char)fgetc(fonte);
+            }
+        }
+        lexema[i] = '\0';
+ 
+        if (ehReal) {
+            token.type = TOKEN_NUM_FLOAT;
+            token.attribute.float_value = atof(lexema);
+        } else {
+            token.type = TOKEN_NUM_INT;
+            token.attribute.int_value = atoi(lexema);
+        }
+        return token;
+    }
+ 
+    /* Operadores relacionais que EXISTEM no enum: <, <=, =, >, >= */
+    if (c == '<') {
+        if (peek() == '=') {
+            fgetc(fonte);
+            token.type = TOKEN_OP_REL;
+            token.attribute.op_code = OP_LE;
+            return token;
+        }
+        /* '<-' (atribuicao) e '<>' (diferente) cairiam aqui, mas nao tem
+           TOKEN_ATRIB nem OP_NE no struct atual -- por ora, erro lexico. */
+        if (peek() == '-' || peek() == '>') {
+            char seq[3] = { '<', (char)fgetc(fonte), '\0' };
+            erroLexico(seq);
+        }
+        token.type = TOKEN_OP_REL;
+        token.attribute.op_code = OP_LT;
+        return token;
+    }
+ 
+    if (c == '>') {
+        if (peek() == '=') {
+            fgetc(fonte);
+            token.type = TOKEN_OP_REL;
+            token.attribute.op_code = OP_GE;
+            return token;
+        }
+        token.type = TOKEN_OP_REL;
+        token.attribute.op_code = OP_GT;
+        return token;
+    }
+ 
+    if (c == '=') {
+        token.type = TOKEN_OP_REL;
+        token.attribute.op_code = OP_EQ;
+        return token;
+    }
+ 
+    {
+        char seqInvalida[2] = { (char)c, '\0' };
+        erroLexico(seqInvalida);
+    }
+ 
+    return token; // inalcancavel (erroLexico sempre sai), exigido pelo compilador
+    
+
 /* 4. CLASSIFICAÇÃO E RETORNO DE TOKENS
  * [ ] Criar a função que avalia o lexema recém-extraído e define seu tipo.
  * [ ] Garantir que Palavras Reservadas da linguagem (algoritmo, var, inicio, se, enquanto, etc.) tenham prioridade de classificação sobre Identificadores comuns.
  * [ ] Preencher e retornar a struct Token com o tipo, linha e atributo correspondente.
  */
+
+
 
 /* 5. FORMATAÇÃO E ARQUIVO DE SAÍDA
  * [ ] Formatar a string de saída no padrão exigido: "Linha# NOME_TOKEN | Atributo".
@@ -140,3 +242,5 @@ typedef enum {
  * [ ] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta.
  * [ ] Abortar imediatamente a execução do programa (exit) após a identificação do erro.
  */
+
+}
