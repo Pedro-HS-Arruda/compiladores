@@ -62,7 +62,11 @@ typedef enum {
             fonte = NULL;
         }
     }
-
+    /* Prototipos das funcoes dos itens 4 e 6, que o proximoToken() ja usa aqui embaixo antes delas serem definidas de fato mais pra frente no
+    * arquivo. Sem isso o compilador "chuta" o tipo (declaracao implicita) e da erro de incompatibilidade quando acha a definicao real depois. */
+    TokenNome classificarPalavra(const char *lexema);
+    int inserirTabelaSimbolos(const char *lexema);
+    void erroLexico(const char *sequencia);
 /*
  *
  * 2. LIMPEZA DE ENTRADA (ESPAÇOS E COMENTÁRIOS)
@@ -121,10 +125,10 @@ typedef enum {
  token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
 
 /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
- * [ ] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
- * [ ] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
+ * [X] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
+ * [X] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
  * [ ] Extrair Cadeias de Caracteres: texto delimitado por aspas duplas.
- * [ ] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
+ * [] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
  */
 
  if (isalpha(c) || c == '_') {
@@ -186,8 +190,7 @@ typedef enum {
             token.attribute.op_code = OP_LE;
             return token;
         }
-        /* '<-' (atribuicao) e '<>' (diferente) cairiam aqui, mas nao tem
-           TOKEN_ATRIB nem OP_NE no struct atual -- por ora, erro lexico. */
+        /* '<-' (atribuicao) e '<>' (diferente) -- por ora, erro lexico. */
         if (peek() == '-' || peek() == '>') {
             char seq[3] = { '<', (char)fgetc(fonte), '\0' };
             erroLexico(seq);
@@ -222,13 +225,43 @@ typedef enum {
  
     return token; // inalcancavel (erroLexico sempre sai), exigido pelo compilador
     
+}
 
 /* 4. CLASSIFICAÇÃO E RETORNO DE TOKENS
  * [ ] Criar a função que avalia o lexema recém-extraído e define seu tipo.
  * [ ] Garantir que Palavras Reservadas da linguagem (algoritmo, var, inicio, se, enquanto, etc.) tenham prioridade de classificação sobre Identificadores comuns.
  * [ ] Preencher e retornar a struct Token com o tipo, linha e atributo correspondente.
  */
-
+TokenNome classificarPalavra(const char *lexema) {
+    static const char *reservadas[] = {
+        "algoritmo", "var", "inicio", "fimalgoritmo",
+        "caractere", "inteiro", "real", "logico",
+        "verdadeiro", "falso",
+        "leia", "escreva", "escreval",
+        "se", "entao", "senao", "fimse",
+        "para", "de", "ate", "passo", "faca", "fimpara",
+        "enquanto", "fimenquanto",
+        "vetor",
+        "procedimento", "fimprocedimento",
+        "funcao", "fimfuncao", "retorne",
+        "MOD", "E", "OU"
+    };
+    int total = (int)(sizeof(reservadas) / sizeof(reservadas[0]));
+ 
+    for (int i = 0; i < total; i++) {
+        if (strcmp(lexema, reservadas[i]) == 0) {
+            return TOKEN_KEYWORD;
+        }
+    }
+    return TOKEN_ID;
+}
+ 
+/* Ainda NAO e a tabela de simbolos de verdade -- so um contador provisorio. */
+int inserirTabelaSimbolos(const char *lexema) {
+    static int proximoIndice = 0;
+    (void)lexema;
+    return proximoIndice++;
+}
 
 
 /* 5. FORMATAÇÃO E ARQUIVO DE SAÍDA
@@ -242,5 +275,9 @@ typedef enum {
  * [ ] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta.
  * [ ] Abortar imediatamente a execução do programa (exit) após a identificação do erro.
  */
+void erroLexico(const char *sequencia) {
+    fprintf(stderr, "ERRO LEXICO na linha %d: \"%s\"\n", linhaAtual, sequencia);
+    fecharAnalisador();
+    exit(1);
 
 }
