@@ -7,6 +7,8 @@
 RA: 10440304
 - Nome: Enrique Cipolla
 RA: 10427834
+- Nome: Pedro Henrique Saraiva Arruda
+RA: 10437747
 
 
 
