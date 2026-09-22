@@ -281,3 +281,4 @@ void erroLexico(const char *sequencia) {
     exit(1);
 
 }
+
