@@ -5,9 +5,18 @@
 
 #define MAX_LEXEMA 128
 
-// esses dois enum tiveram que vir para cima do struct Token, porque o C
-// não deixa usar um tipo antes dele existir (dava erro de compilação
-// "unknown type name" quando eu deixei embaixo)
+typedef struct {
+    TokenNome type; //Nome do token
+    int line; // Para tratamento de erros
+
+    union{
+        int table_index; // Índice para Tabela de Símbolos
+        int int_value; //Valor literal convertido
+        double float_value; //Valor literal convertido
+        OpRelType op_code; //operador relacional específico
+    } attribute;
+
+} Token;
 
 typedef enum {
     TOKEN_EOF = 0,
@@ -15,15 +24,22 @@ typedef enum {
     TOKEN_NUM_INT,
     TOKEN_NUM_FLOAT,
     TOKEN_OP_REL,
-    TOKEN_KEYWORD
+    TOKEN_KEYWORD,
+    /* Extensoes necessarias: a gramatica do relatorio (Etapa 1) exige cadeias,
+       atribuicao, operadores aritmeticos e delimitadores, que nao apareciam
+       no modelo de token da Figura 2. */
+    TOKEN_CADEIA,
+    TOKEN_OP_ARIT,
+    TOKEN_DELIM
 } TokenNome;
 
 typedef enum {
     OP_LT, // <
     OP_LE, // <=
-    OP_EQ, // ==
+    OP_EQ, // =   (a gramatica usa '=' como igualdade, nao '==')
     OP_GT, // >
-    OP_GE, // >= 
+    OP_GE, // >=
+    OP_NE  // <>  -- extensao: a gramatica usa '<>' para "diferente" e o modelo original nao previa
 } OpRelType;
 
 typedef struct {
@@ -48,34 +64,29 @@ typedef struct {
  * [X] Criar a variável global de controle de linha atual (inicializada em 1).
  * [X] Implementar as funções de ciclo de vida: abrir arquivo, checar EOF (fim de arquivo) e fechar arquivo.
 */
-FILE *fonte = NULL; // Ponteiro para o arquivo de entrada
-int linhaAtual = 1; // Contador de linha atual
+    FILE *fonte = NULL; // Ponteiro para o arquivo de entrada
+    int linhaAtual = 1; // Contador de linha atual
 
 void iniciarAnalisador(FILE *arquivo) {
     fonte = arquivo;
     linhaAtual = 1;
 }
 
-int fimDoArquivo(){
-    return(fonte == NULL || feof(fonte)); // retorna true se o arquivo for nulo ou se chegou no final do arquivo, representado pelo feof()
-}
-
-void fecharAnalisador(){ 
-    if(fonte != NULL) {
-        fclose(fonte);
-        fonte = NULL;
+    int fimDoArquivo(){
+        return(fonte == NULL || feof(fonte)); // retorna true se o arquivo for nulo ou se chegou no final do arquivo, representado pelo feof()
     }
-}
 
-// preciso avisar pro compilador que essas 3 funções aqui embaixo existem
-// (mesmo elas sendo definidas só lá na frente, nos itens 4 e 6), porque a
-// proximoToken() já usa elas antes disso. se eu não avisar, o compilador
-// dá erro de "declarado implicitamente" quando ele finalmente ve a
-// função de verdade com um tipo diferente do que ele tinha "chutado"
-TokenNome classificarPalavra(const char *lexema);
-int inserirTabelaSimbolos(const char *lexema);
-void erroLexico(const char *sequencia);
-
+    void fecharAnalisador(){ 
+        if(fonte != NULL) {
+            fclose(fonte);
+            fonte = NULL;
+        }
+    }
+    /* Prototipos das funcoes dos itens 4 e 6, que o proximoToken() ja usa aqui embaixo antes delas serem definidas de fato mais pra frente no
+    * arquivo. Sem isso o compilador "chuta" o tipo (declaracao implicita) e da erro de incompatibilidade quando acha a definicao real depois. */
+    TokenNome classificarPalavra(const char *lexema);
+    int inserirTabelaSimbolos(const char *lexema);
+    void erroLexico(const char *sequencia);
 /*
  *
  * 2. LIMPEZA DE ENTRADA (ESPAÇOS E COMENTÁRIOS)
@@ -84,7 +95,7 @@ void erroLexico(const char *sequencia);
  * [X] Descartar comentários: ao identificar '//', ignorar todos os caracteres seguintes até encontrar uma quebra de linha.
  */
 
-int peek() { // A função peek espia o próximo caractere sem consumi-lo do buffer
+ int peek() { // A função peek espia o próximo caractere sem consumi-lo do buffer
     int c = fgetc(fonte); // tal que c representa um charactere lido do arquivo fonte e o fgetc() lê o próximo caractere do arquivo fonte e retorna seu valor como um inteiro
     if (c != EOF) { 
         ungetc(c, fonte); // ele devolve o caractere lido para o fluxo
@@ -92,54 +103,51 @@ int peek() { // A função peek espia o próximo caractere sem consumi-lo do buf
     return c;
 }
 
-//Limpeza de Entrada
-Token proximoToken() {
+ //Limpeza de Entrada
+ Token proximoToken() {
     Token token;
     int c;
+    int i = 0;
 
     while((c =fgetc(fonte)) != EOF) { // Laço contínuo para ignorar espaços em branco e comentários
         
         if(c == '\n') { //Controle de linha do programa fonte
             linhaAtual++;
         }
-
-        if (isspace(c)) { // identifica espaços em branco, tabulações e quebras de linha
-            continue; //pula para a próxima iteração do laço
+        if (isspace(c)) {
+            continue;
         }
-
-        //Identificação de comentários usando o peek
-        if(c == '/' && peek() == '/') {
-            while((c = fgetc(fonte)) != EOF && c != '\n'); // ignora todos os caracteres até encontrar uma quebra de linha
-            
-            if(c == '\n') { 
-                linhaAtual++; // Incrementa o contador de linha ao detectar '\n'
+        if (c == '/' && peek() == '/') {
+            while ((c = fgetc(fonte)) != EOF && c != '\n');
+            if (c == '\n') {
+                linhaAtual++;
             }
             continue; //Volta para o inicio do laço para continuar a leitura
-        }   
-        
-        // Se o caractere não for espaço em branco, tabulação, quebra de linha ou comentário, ele é parte de um token válido
-        break;
-    }
+    }   
+    
+    // Se o caractere não for espaço em branco, tabulação, quebra de linha ou comentário, ele é parte de um token válido
+    break;
+ }
 
-    if (c == EOF) { // Se o final do arquivo for atingido, retorna um token de fim de arquivo
-        token.type = TOKEN_EOF;
-        token.line = linhaAtual;
-        return token;
-    }
+ if (c == EOF) { // Se o final do arquivo for atingido, retorna um token de fim de arquivo
+    token.type = TOKEN_EOF;
+    token.line = linhaAtual;
+    return token;
+ }
 
-    // (aqui antes eu tinha colocado um "return token;" sem querer, e isso
-    // fazia a função já sair pra fora sem nunca chegar no item 3 lá embaixo.
-    // apaguei ele, senão nenhum token de verdade era reconhecido)
-    token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
+ return token; // Retorna o token válido encontrado
+ 
+ 
+ token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
 
 /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
  * [X] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
  * [X] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
  * [ ] Extrair Cadeias de Caracteres: texto delimitado por aspas duplas.
- * [ ] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
+ * [] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
  */
 
-    if (isalpha(c) || c == '_') {
+ if (isalpha(c) || c == '_') {
         char lexema[MAX_LEXEMA];
         int i = 0;
         lexema[i++] = (char)c;
@@ -155,7 +163,7 @@ Token proximoToken() {
         }
         return token;
     }
-
+ 
     if (isdigit(c)) {
         char lexema[MAX_LEXEMA];
         int i = 0;
@@ -169,10 +177,10 @@ Token proximoToken() {
         if (peek() == '.') {
             ehReal = 1;
             lexema[i++] = (char)fgetc(fonte);
-
+ 
             if (!isdigit(peek())) {
                 lexema[i] = '\0';
-                erroLexico(lexema);
+                erroLexico(lexema); // ex: "3." sem digito depois nao e valido
             }
             while (i < MAX_LEXEMA - 1 && isdigit(peek())) {
                 lexema[i++] = (char)fgetc(fonte);
@@ -189,17 +197,22 @@ Token proximoToken() {
         }
         return token;
     }
-
-    // operadores relacionais que já existem no enum: <, <=, =, >, >=
+ 
+    /* Operadores relacionais que EXISTEM no enum: <, <=, =, >, >= */
     if (c == '<') {
-        if (peek() == '=') {
+        int prox = peek();
+        if (prox == '-') {
+            fgetc(fonte);
+            token.type = TOKEN_OP_REL;
+            return token;
+        }
+        if (prox == '=') {
             fgetc(fonte);
             token.type = TOKEN_OP_REL;
             token.attribute.op_code = OP_LE;
             return token;
         }
-        // '<-' (atribuição) e '<>' (diferente) eu ainda não sei pra onde
-        // mandar, então por enquanto viram erro léxico mesmo
+        /* '<-' (atribuicao) e '<>' (diferente) -- por ora, erro lexico. */
         if (peek() == '-' || peek() == '>') {
             char seq[3] = { '<', (char)fgetc(fonte), '\0' };
             erroLexico(seq);
@@ -226,26 +239,22 @@ Token proximoToken() {
         token.attribute.op_code = OP_EQ;
         return token;
     }
-
-    // qualquer outra coisa (aspas, +, -, :, etc.) eu ainda não sei
-    // classificar com o struct que a gente tem, então cai aqui como erro
+ 
     {
         char seqInvalida[2] = { (char)c, '\0' };
         erroLexico(seqInvalida);
     }
-
-    return token; // essa linha nunca roda de verdade (erroLexico sempre
-                   // encerra o programa antes), mas o compilador exige
-                   // que toda função com retorno tenha um return no final
+ 
+    return token; // inalcancavel (erroLexico sempre sai), exigido pelo compilador
+    
 }
 
 /* 4. CLASSIFICAÇÃO E RETORNO DE TOKENS
- * [X] Criar a função que avalia o lexema recém-extraído e define seu tipo.
- * [X] Garantir que Palavras Reservadas da linguagem (algoritmo, var, inicio, se, enquanto, etc.) tenham prioridade de classificação sobre Identificadores comuns.
- * [X] Preencher e retornar a struct Token com o tipo, linha e atributo correspondente.
+ * [ ] Criar a função que avalia o lexema recém-extraído e define seu tipo.
+ * [ ] Garantir que Palavras Reservadas da linguagem (algoritmo, var, inicio, se, enquanto, etc.) tenham prioridade de classificação sobre Identificadores comuns.
+ * [ ] Preencher e retornar a struct Token com o tipo, linha e atributo correspondente.
  */
 TokenNome classificarPalavra(const char *lexema) {
-    // lista com todas as palavras reservadas do relatório da etapa 1
     static const char *reservadas[] = {
         "algoritmo", "var", "inicio", "fimalgoritmo",
         "caractere", "inteiro", "real", "logico",
@@ -260,10 +269,7 @@ TokenNome classificarPalavra(const char *lexema) {
         "MOD", "E", "OU"
     };
     int total = (int)(sizeof(reservadas) / sizeof(reservadas[0]));
-
-    // comparo o lexema com cada palavra da lista. se bater com alguma,
-    // é reservada. isso já garante a prioridade que o item pede, porque
-    // só cai em TOKEN_ID se não bateu com nenhuma reservada
+ 
     for (int i = 0; i < total; i++) {
         if (strcmp(lexema, reservadas[i]) == 0) {
             return TOKEN_KEYWORD;
@@ -271,13 +277,11 @@ TokenNome classificarPalavra(const char *lexema) {
     }
     return TOKEN_ID;
 }
-
-// isso aqui ainda não é a tabela de símbolos de verdade que o projeto vai
-// precisar depois -- é só um contador provisório pra função de cima ter
-// algum número pra colocar no table_index sem dar erro
+ 
+/* Ainda NAO e a tabela de simbolos de verdade -- so um contador provisorio. */
 int inserirTabelaSimbolos(const char *lexema) {
     static int proximoIndice = 0;
-    (void)lexema; // por enquanto não uso o lexema pra nada, só pra não sobrar warning de parametro nao usado
+    (void)lexema;
     return proximoIndice++;
 }
 
@@ -287,58 +291,31 @@ int inserirTabelaSimbolos(const char *lexema) {
  * [ ] Imprimir cada token no terminal (stdout) à medida que são reconhecidos.
  * [ ] Gravar a mesma saída formatada em um arquivo de texto de log.
  */
-
- void registrar_token(Token t, FILE *arquivo_log) {
-    const char *nome_tipo;
-
-    switch (t.type) {
-        case TOKEN_KEYWORD: nome_tipo = "PALAVRA_RESERVADA"; break;
-        case TOKEN_ID:      nome_tipo = "IDENTIFICADOR";     break;
-        case TOKEN_NUM_INT: nome_tipo = "NUMERO";            break;
-        default:            nome_tipo = "DESCONHECIDO";      break;
+  void registrar_token(Token t, FILE *arquivo_log){
+        const char *nome_tipo;
+        switch (t.type){
+            case TOKEN_KEYWORD: nome_tipo = "PALAVRA_RESERVADA"; break;
+            case TOKEN_ID: nome_tipo = "IDENTIFICADOR"; break;
+            case TOKEN_NUM_INT: nome_tipo = "NUMERO"; break;
+            default: nome_tipo = "DESCONHECIDO"; break;
+        }
+        //imprime no formato correto
+        printf("Linha# %d %s | %s\n", t.line, nome_tipo, nome_tipo);
+        //grava a saída no arquivo de saída no formato correto
+        if(arquivo_log != NULL){
+            fprintf(arquivo_log, "Linha# %d %s | %s\n", t.line, nome_tipo);
+        }
     }
-
-    printf("Linha# %d %s\n", t.line, nome_tipo);
-
-    if (arquivo_log != NULL) {
-        fprintf(arquivo_log, "Linha# %d %s\n", t.line, nome_tipo);
-    }
-}
-
-// esse main() aqui é só pra eu conseguir testar se o lexer tá funcionando.
-// ainda não é a versão final (falta formatar do jeito que o item 5 pede
-// e salvar num arquivo de log)
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
-        return 1;
-    }
-
-    FILE *arq = fopen(argv[1], "r");
-    if (arq == NULL) {
-        fprintf(stderr, "Nao foi possivel abrir o arquivo: %s\n", argv[1]);
-        return 1;
-    }
-
-    iniciarAnalisador(arq);
-
-    Token t;
-    do {
-        t = proximoToken();
-        printf("linha %d -> type=%d\n", t.line, t.type); // saida crua so pra eu testar, nao e o formato final
-    } while (t.type != TOKEN_EOF);
-
-    fecharAnalisador();
-    return 0;
-}
 
 /* 6. TRATAMENTO DE ERROS LÉXICOS
- * [X] Interceptar qualquer caractere lido que não pertença ao alfabeto/regras da linguagem MiniVisualg.
- * [ ] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta (falta acentuar certinho e formatar igual o item 5 pede).
- * [X] Abortar imediatamente a execução do programa (exit) após a identificação do erro.
+ * [ ] Interceptar qualquer caractere lido que não pertença ao alfabeto/regras da linguagem MiniVisualg.
+ * [ ] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta.
+ * [ ] Abortar imediatamente a execução do programa (exit) após a identificação do erro.
  */
 void erroLexico(const char *sequencia) {
     fprintf(stderr, "ERRO LEXICO na linha %d: \"%s\"\n", linhaAtual, sequencia);
     fecharAnalisador();
     exit(1);
+
 }
+
