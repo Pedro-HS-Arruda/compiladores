@@ -1,3 +1,0 @@
-   algoritmo
-   inicio
-   fimalgoritmo
