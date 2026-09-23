@@ -347,19 +347,6 @@ void erroLexico(const char *sequencia) {
 
 /* TODO LIST - ETAPA 3: ANALISADOR SINTATICO (MINIVISUALG)
 
-1. INTEGRACAO COM O ANALISADOR LEXICO
-[X] Criar a variavel/estrutura que guarda o "token atual" (o lookahead do parser).
-[X] Implementar a funcao nextToken() do lado do sintatico, que chama obterToken() do lexico e atualiza o token atual (nomes sugeridos pela professora na Figura 1).
-[X] Antes de comecar a analise, chamar nextToken() uma vez para carregar o primeiro token do arquivo.
-
-2. FUNCOES AUXILIARES DE APOIO AO PARSER
-[ ] Criar uma funcao que confere se o token atual e do tipo esperado e, se for,
-    avanca para o proximo (senao, aciona o erro sintatico).
-[ ] Criar uma funcao que confere se o token atual e uma palavra reservada
-    especifica (ex: "se", "enquanto", "fimalgoritmo").
-[ ] Criar uma funcao que confere se o token atual e um delimitador ou operador
-    especifico (ex: '(', ')', ':', ',').
-
 3. IMPLEMENTACAO DA GRAMATICA - ESTRUTURA GERAL
 [ ] algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
 [ ] declaracao -> declaracao_var | declaracao_procedimento | declaracao_funcao
@@ -416,12 +403,70 @@ void erroLexico(const char *sequencia) {
 
 */
 
+/* 1. INTEGRACAO COM O ANALISADOR LEXICO
+[X] Criar a variavel/estrutura que guarda o "token atual" (o lookahead do parser).
+[X] Implementar a funcao nextToken() do lado do sintatico, que chama obterToken() do lexico e atualiza o token atual
+[X] Antes de comecar a analise, chamar nextToken() uma vez para carregar o primeiro token do arquivo.
+*/
+//TOKEN ATUAL
 Token tokenAtual;
-
+//OBTEM O TOKEN DE FATO
 Token obterToken(void) {
     return proximoToken();
 }
-
+//PEGA O PROXIMO TOKEN
 void nextToken(void) {
     tokenAtual = obterToken();
+}
+
+/*
+2. FUNCOES AUXILIARES DE APOIO AO PARSER
+[X] Criar uma funcao que confere se o token atual e do tipo esperado e, se for, avanca para o proximo (senao, aciona o erro sintatico).
+[X] Criar uma funcao que confere se o token atual e uma palavra reservada especifica (ex: "se", "enquanto", "fimalgoritmo").
+[X] Criar uma funcao que confere se o token atual e um delimitador ou operador especifico (ex: '(', ')', ':', ',').
+*/
+//OLHA SE É O TOKEN ATUAL É O TIPO ESPERADO
+int caseToken(TokenNome tipoEsperado){
+    if (tokenAtual.type == tipoEsperado){
+        nextToken();
+        return 1;
+    } else {
+        char msg[50];
+        sprintf(msg, "token do tipo %d", tipoEsperado);
+        erroSintatico(msg);
+        return 0;
+    }
+}
+//VERIFICA SE O TOKEN ATUAL É UMA DAS PALAVRAS RESERVADAS MAPEADAS NA ETAPA 1
+int checarPalavraReservada(const char *palavra){
+    if(tokenAtual.type == TOKEN_KEYWORD){//SE FOR UMAPALAVRA RESERVADA
+        nextToken();//PEGA O PROXIMO TOKEN
+        return 1;
+    }
+    return 0; // CASO CONTRARIO, RETONA
+}
+
+//VERIFICA SE O TOKEN ATUAL É UM DELIMITADOR OU OPERADOR ESPECIFICO
+int checarDelimitadorOperador(int opDe){
+    if(tokenAtual.type == TOKEN_OP_REL){ // SE O TOKEN ATUAL FOR UM OPERADOR RELACIONAL
+        if(tokenAtual.attribute.op_code = opDe){ // SE TOKEN ATUAL FOR UM OPERADOR
+            nextToken(); // PEGA O PROXIMO TOKEN
+            return 1;
+        }
+    }
+    return 0;// CASO CONTRARIO, RETORNA 0
+}
+
+//FUNÇÃO INICIAL PARA CONSEGUIR TESTAR/RODAR DEPOIS
+void analisadorSintatico(FILE *arq) {
+    iniciarAnalisador(arq);
+
+    nextToken(); // Carrega o primeiro token (lookahead)
+
+    while (tokenAtual.type != TOKEN_EOF) {
+        printf("[Parser Lookahead] Linha %d | Type: %d\n", tokenAtual.line, tokenAtual.type);
+        nextToken();
+    }
+
+    fecharAnalisador();
 }
