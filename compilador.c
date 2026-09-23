@@ -283,7 +283,7 @@ int inserirTabelaSimbolos(const char *lexema) {
 
 
 /* 5. FORMATAÇÃO E ARQUIVO DE SAÍDA
- * [ ] Formatar a string de saída no padrão exigido: "Linha# NOME_TOKEN | Atributo".
+ * [ ] Formatar a string de saída no padrão exigido: Número da Linha do Átomo# NomeToken | Atributo
  * [ ] Imprimir cada token no terminal (stdout) à medida que são reconhecidos.
  * [ ] Gravar a mesma saída formatada em um arquivo de texto de log.
  */
@@ -298,10 +298,10 @@ int inserirTabelaSimbolos(const char *lexema) {
         default:            nome_tipo = "DESCONHECIDO";      break;
     }
 
-    printf("Linha# %d %s\n", t.line, nome_tipo);
+    printf("Número da Linha# %d | %s\n", t.line, nome_tipo);
 
     if (arquivo_log != NULL) {
-        fprintf(arquivo_log, "Linha# %d %s\n", t.line, nome_tipo);
+        fprintf(arquivo_log, "Número da Linha# %d | %s\n", t.line, nome_tipo);
     }
 }
 
