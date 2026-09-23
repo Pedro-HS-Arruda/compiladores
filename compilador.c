@@ -7,6 +7,7 @@
 char lexemaAtual[MAX_LEXEMA];
 #define OP_ASSIGN 5
 #define OP_NE     6
+FILE *arquivoSaida = NULL;
 
 // esses dois enum tiveram que vir para cima do struct Token, porque o C
 // não deixa usar um tipo antes dele existir (dava erro de compilação
@@ -285,7 +286,7 @@ Token proximoToken() {
     }
 
     char seqInvalida[2] = { (char)c, '\0' };
-    erroLexico("seqInvalida");
+    erroLexico(seqInvalida);
     return token;
 }
 
@@ -980,7 +981,6 @@ void analisadorSintatico(FILE *arq) {
 // esse main() aqui é só pra eu conseguir testar se o lexico tá funcionando.
 // ainda não é a versão final (falta formatar do jeito que o item 5 pede
 // e salvar num arquivo de log)
-FILE *arquivoSaida = NULL;
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
