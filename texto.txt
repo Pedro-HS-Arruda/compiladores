@@ -1,6 +1,5 @@
 algoritmo "nome_do_algoritmo"
 var
-    // Seção para declarar as variáveis
     nome: caractere
     idade: inteiro
 inicio

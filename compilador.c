@@ -278,10 +278,12 @@ Token proximoToken() {
     }
 
     
+    // Operadores e Delimitadores em geral
     if (c == '(' || c == ')' || c == ',' || c == ':' || 
         c == '[' || c == ']' || c == '+' || c == '-' || 
         c == '*' || c == '/' || c == '\\') {
         token.type = TOKEN_OP_REL;
+        token.attribute.op_code = c; // Guarda o próprio caractere como código!
         return token;
     }
 
@@ -707,8 +709,6 @@ void retorno() {
 */
 void comando() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
-        // Como o tokenAtual é uma palavra reservada, verifica o fluxo adequado:
-        // Exemplo: se, para, enquanto, leia, escreva, retorne
         if (strcmp(lexemaAtual, "leia") == 0) {
             leitura();
         } else if (strcmp(lexemaAtual, "escreva") == 0 || strcmp(lexemaAtual, "escreval") == 0) {
@@ -719,19 +719,15 @@ void comando() {
             repeticaoPara();
         } else if (strcmp(lexemaAtual, "enquanto") == 0) {
             repeticaoEnquanto();
-        } else if (strcmp(lexemaAtual, "retorne") == 0) {
-            retorno();
         } else {
-            // Procedimento sem parâmetros ou palavra reservada de bloco
             nextToken();
         }
     } 
     else if (tokenAtual.type == TOKEN_ID) {
-        // Atribuição (ex: x <- 10 ou vet[1] <- 5) ou chamada de função/procedimento
         atribuicao();
     } 
     else {
-        erroSintatico("Comando inválido encontrado");
+        erroSintatico("comando valido");
     }
 }
 
@@ -831,12 +827,22 @@ void declaracaoVar() {
     checarPalavraReservada(); // Consome 'var'
 
     while (tokenAtual.type == TOKEN_ID) {
-        casaToken(TOKEN_ID);
-        while (tokenAtual.type == TOKEN_OP_REL) { // Se houver vírgula
-            nextToken();
+        casaToken(TOKEN_ID); // Consome o primeiro identificador
+
+        // Se houver mais identificadores separados por vírgula (ex: x, y)
+        while (tokenAtual.type == TOKEN_OP_REL && tokenAtual.attribute.op_code == ',') {
+            nextToken(); // Consome ','
             casaToken(TOKEN_ID);
         }
-        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // Consome ':'
+
+        // Verifica e consome obrigatoriamente o dois-pontos ':'
+        if (tokenAtual.type == TOKEN_OP_REL && tokenAtual.attribute.op_code == ':') {
+            nextToken(); // Consome ':'
+        } else {
+            erroSintatico("':' esperado apos o nome da variavel");
+        }
+
+        // Consome o tipo da variável (ex: 'inteiro', 'caractere')
         tipoBase();
     }
 }
@@ -892,36 +898,64 @@ void declaracaoFuncao() {
 */
 // algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
 void algoritmo() {
-    // Permite processar múltiplos algoritmos presentes no mesmo arquivo fonte
-    while (tokenAtual.type != TOKEN_EOF) {
-        // Procura início de um algoritmo
-        if (tokenAtual.type == TOKEN_KEYWORD) {
-            checarPalavraReservada(); // Consome 'algoritmo' ou palavra reservada inicial
+    // // Permite processar múltiplos algoritmos presentes no mesmo arquivo fonte
+    // while (tokenAtual.type != TOKEN_EOF) {
+    //     // Procura início de um algoritmo
+    //     if (tokenAtual.type == TOKEN_KEYWORD) {
+    //         checarPalavraReservada(); // Consome 'algoritmo' ou palavra reservada inicial
             
-            if (tokenAtual.type == TOKEN_ID) {
-                casaToken(TOKEN_ID); // Consome nome do algoritmo/função/procedimento
-            }
-        }
+    //         if (tokenAtual.type == TOKEN_ID) {
+    //             casaToken(TOKEN_ID); // Consome nome do algoritmo/função/procedimento
+    //         }
+    //     }
 
-        // Processa declaração var se existir
-        if (tokenAtual.type == TOKEN_KEYWORD) {
-            declaracaoVar();
-        }
+    //     // Processa declaração var se existir
+    //     if (tokenAtual.type == TOKEN_KEYWORD) {
+    //         declaracaoVar();
+    //     }
 
-        // Processa início se existir
-        if (tokenAtual.type == TOKEN_KEYWORD) {
-            nextToken(); // Consome 'inicio'
-        }
+    //     // Processa início se existir
+    //     if (tokenAtual.type == TOKEN_KEYWORD) {
+    //         nextToken(); // Consome 'inicio'
+    //     }
 
-        // Bloco de comandos do algoritmo
-        while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
-            comando();
-        }
+    //     // Bloco de comandos do algoritmo
+    //     while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+    //         comando();
+    //     }
 
-        // Se encontrou fimalgoritmo, consome e avança para o próximo
-        if (tokenAtual.type == TOKEN_KEYWORD) {
-            nextToken(); // Consome 'fimalgoritmo' / 'fimprocedimento' / 'fimfuncao'
-        }
+    //     // Se encontrou fimalgoritmo, consome e avança para o próximo
+    //     if (tokenAtual.type == TOKEN_KEYWORD) {
+    //         nextToken(); // Consome 'fimalgoritmo' / 'fimprocedimento' / 'fimfuncao'
+    //     }
+    // }
+    // 1. Palavra-chave 'algoritmo'
+    checarPalavraReservada(); 
+
+    // 2. Nome do algoritmo (Cadeia de texto entre aspas)
+    if (tokenAtual.type == TOKEN_ID) {
+        casaToken(TOKEN_ID);
+    }
+
+    // 3. Bloco de Declarações (Var, Procedimento, Função)
+    while (tokenAtual.type == TOKEN_KEYWORD && strcmp(lexemaAtual, "var") == 0) {
+        declaracaoVar();
+    }
+
+    // 4. Início do bloco principal
+    if (tokenAtual.type == TOKEN_KEYWORD && strcmp(lexemaAtual, "inicio") == 0) {
+        nextToken(); // Consome 'inicio'
+    }
+
+    // 5. Bloco de Comandos
+    while (tokenAtual.type != TOKEN_EOF && 
+          !(tokenAtual.type == TOKEN_KEYWORD && strcmp(lexemaAtual, "fimalgoritmo") == 0)) {
+        comando();
+    }
+
+    // 6. Fim do algoritmo
+    if (tokenAtual.type == TOKEN_KEYWORD && strcmp(lexemaAtual, "fimalgoritmo") == 0) {
+        nextToken(); // Consome 'fimalgoritmo'
     }
 }
 void declaracao() {
