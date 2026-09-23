@@ -894,7 +894,11 @@ void declaracao(void) {
 [ ] Abortar imediatamente a execucao do programa (exit) apos identificar o erro.
 */
 void erroSintatico(char msg[MAX_LEXEMA]){
-    printf("Erro sintático: ", msg);
+    fprintf(stderr, "ERRO SINTATICO na linha %d: %s\n", tokenAtual.line, msg);
+
+    fecharAnalisador();
+    
+    exit(1);
 }
 
 /*
