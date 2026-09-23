@@ -1,10 +1,14 @@
-algoritmo "MensagemDupla"
+algoritmo "nome_do_algoritmo"
 var
-
+    // Seção para declarar as variáveis
+    nome: caractere
+    idade: inteiro
 inicio
-    // O comando escreva (sem o 'L') não pula linha!
-    escreva("Bem-vindo ao ")
-    escreval("VisuAlg 3.0!")
-    escreval("Vamos começar a programar.")
+    // Seção de comandos e lógica
+    escreva("Digite seu nome: ")
+    leia(nome)
+    escreva("Digite sua idade: ")
+    leia(idade)
 
+    escreva("Olá, ", nome, ". Você tem ", idade, " anos.")
 fimalgoritmo

@@ -4,6 +4,9 @@
 #include <ctype.h>
 
 #define MAX_LEXEMA 128
+char lexemaAtual[MAX_LEXEMA];
+#define OP_ASSIGN 5
+#define OP_NE     6
 
 // esses dois enum tiveram que vir para cima do struct Token, porque o C
 // não deixa usar um tipo antes dele existir (dava erro de compilação
@@ -126,48 +129,36 @@ Token proximoToken() {
     Token token;
     int c;
 
-    while((c =fgetc(fonte)) != EOF) { // Laço contínuo para ignorar espaços em branco e comentários
-        
-        if(c == '\n') { //Controle de linha do programa fonte
+    while ((c = fgetc(fonte)) != EOF) {
+        if (c == '\n') {
             linhaAtual++;
+            continue;
         }
 
-        if (isspace(c)) { // identifica espaços em branco, tabulações e quebras de linha
-            continue; //pula para a próxima iteração do laço
+        if (isspace(c)) {
+            continue;
         }
 
-        //Identificação de comentários usando o peek
-        if(c == '/' && peek() == '/') {
-            while((c = fgetc(fonte)) != EOF && c != '\n'); // ignora todos os caracteres até encontrar uma quebra de linha
-            
-            if(c == '\n') { 
-                linhaAtual++; // Incrementa o contador de linha ao detectar '\n'
+        // Ignora comentários no estilo //
+        if (c == '/' && peek() == '/') {
+            while ((c = fgetc(fonte)) != EOF && c != '\n');
+            if (c == '\n') {
+                linhaAtual++;
             }
-            continue; //Volta para o inicio do laço para continuar a leitura
-        }   
-        
-        // Se o caractere não for espaço em branco, tabulação, quebra de linha ou comentário, ele é parte de um token válido
+            continue;
+        }
         break;
     }
 
-    if (c == EOF) { // Se o final do arquivo for atingido, retorna um token de fim de arquivo
+    if (c == EOF) {
         token.type = TOKEN_EOF;
         token.line = linhaAtual;
         return token;
     }
 
-    // (aqui antes eu tinha colocado um "return token;" sem querer, e isso
-    // fazia a função já sair pra fora sem nunca chegar no item 3 lá embaixo.
-    // apaguei ele, senão nenhum token de verdade era reconhecido)
-    token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
+    token.line = linhaAtual;
 
-    /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
-    * [X] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
-    * [X] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
-    * [X] Extrair Cadeias de Caracteres: texto delimitado por aspas duplas.
-    * [X] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
-    */
-
+    // Leitura de Palavras Reservadas e Identificadores
     if (isalpha(c) || c == '_') {
         char lexema[MAX_LEXEMA];
         int i = 0;
@@ -178,6 +169,9 @@ Token proximoToken() {
         }
         lexema[i] = '\0';
 
+        // Guarda o texto lido na variável global sem alterar o struct Token
+        strcpy(lexemaAtual, lexema);
+
         token.type = classificarPalavra(lexema);
         if (token.type == TOKEN_ID) {
             token.attribute.table_index = inserirTabelaSimbolos(lexema);
@@ -185,6 +179,7 @@ Token proximoToken() {
         return token;
     }
 
+    // Leitura de Números (Inteiros e Reais)
     if (isdigit(c)) {
         char lexema[MAX_LEXEMA];
         int i = 0;
@@ -199,10 +194,6 @@ Token proximoToken() {
             ehReal = 1;
             lexema[i++] = (char)fgetc(fonte);
 
-            if (!isdigit(peek())) {
-                lexema[i] = '\0';
-                erroLexico(lexema);
-            }
             while (i < MAX_LEXEMA - 1 && isdigit(peek())) {
                 lexema[i++] = (char)fgetc(fonte);
             }
@@ -219,25 +210,53 @@ Token proximoToken() {
         return token;
     }
 
-    // operadores relacionais que já existem no enum: <, <=, =, >, >=
+    // Leitura de Strings entre Aspas "..."
+    if (c == '"') {
+        char lexema[MAX_LEXEMA];
+        int i = 0;
+
+        while ((c = fgetc(fonte)) != EOF && c != '"' && c != '\n') {
+            if (i < MAX_LEXEMA - 1) {
+                lexema[i++] = (char)c;
+            }
+        }
+
+        if (c != '"') {
+            erroLexico("Cadeia de texto nao fechada");
+        }
+
+        lexema[i] = '\0';
+        token.type = TOKEN_ID;
+        token.attribute.table_index = inserirTabelaSimbolos(lexema);
+        return token;
+    }
+
+    // Operador <- (Atribuição), <=, <>, <
     if (c == '<') {
+        if (peek() == '-') {
+            fgetc(fonte);
+            token.type = TOKEN_OP_REL;
+            token.attribute.op_code = OP_ASSIGN;
+            return token;
+        }
         if (peek() == '=') {
             fgetc(fonte);
             token.type = TOKEN_OP_REL;
             token.attribute.op_code = OP_LE;
             return token;
         }
-        // '<-' (atribuição) e '<>' (diferente) eu ainda não sei pra onde
-        // mandar, então por enquanto viram erro léxico mesmo
-        if (peek() == '-' || peek() == '>') {
-            char seq[3] = { '<', (char)fgetc(fonte), '\0' };
-            erroLexico(seq);
+        if (peek() == '>') {
+            fgetc(fonte);
+            token.type = TOKEN_OP_REL;
+            token.attribute.op_code = OP_NE;
+            return token;
         }
         token.type = TOKEN_OP_REL;
         token.attribute.op_code = OP_LT;
         return token;
     }
 
+    // Operadores >= e >
     if (c == '>') {
         if (peek() == '=') {
             fgetc(fonte);
@@ -250,61 +269,24 @@ Token proximoToken() {
         return token;
     }
 
+    // Operador =
     if (c == '=') {
         token.type = TOKEN_OP_REL;
         token.attribute.op_code = OP_EQ;
         return token;
     }
-    // Adicione no proximoToken() antes do erro léxico:
-    if (c == '"') {
-        char lexema[MAX_LEXEMA];
-        int i = 0;
 
-        // Consome caracteres até encontrar a aspa de fechamento ou fim de linha/arquivo
-        while ((c = fgetc(fonte)) != EOF && c != '"' && c != '\n') {
-            if (i < MAX_LEXEMA - 1) {
-                lexema[i++] = (char)c;
-            }
-        }
-
-        if (c != '"') {
-            // String não foi fechada antes do fim da linha ou arquivo
-            erroLexico("Cadeia de texto nao fechada");
-        }
-
-        lexema[i] = '\0'; // Finaliza a string em C
-
-        token.type = TOKEN_ID; // ou o tipo correspondente a texto na sua estrutura
-        
-        // AQUI USAMOS O LEXEMA PARA O ERRO SUMIR:
-        token.attribute.table_index = inserirTabelaSimbolos(lexema);
-        token.line = linhaAtual;
-
-        return token;
-    }
-    // Tratamento dos parênteses no proximoToken()
-    if (c == '(') {
-        token.type = TOKEN_OP_REL; // Ou um tipo delimitador, se tiver na sua struct/enum
-        token.line = linhaAtual;
+    
+    if (c == '(' || c == ')' || c == ',' || c == ':' || 
+        c == '[' || c == ']' || c == '+' || c == '-' || 
+        c == '*' || c == '/' || c == '\\') {
+        token.type = TOKEN_OP_REL;
         return token;
     }
 
-    if (c == ')') {
-        token.type = TOKEN_OP_REL; // Ou um tipo delimitador
-        token.line = linhaAtual;
-        return token;
-    }
-
-    // qualquer outra coisa (aspas, +, -, :, etc.) eu ainda não sei
-    // classificar com o struct que a gente tem, então cai aqui como erro
-    {
-        char seqInvalida[2] = { (char)c, '\0' };
-        erroLexico(seqInvalida);
-    }
-
-    return token; // essa linha nunca roda de verdade (erroLexico sempre
-                   // encerra o programa antes), mas o compilador exige
-                   // que toda função com retorno tenha um return no final
+    char seqInvalida[2] = { (char)c, '\0' };
+    erroLexico("seqInvalida");
+    return token;
 }
 
 /* 4. CLASSIFICAÇÃO E RETORNO DE TOKENS
@@ -400,9 +382,44 @@ Token tokenAtual;
 Token obterToken(void) {
     return proximoToken();
 }
+void imprimirToken(Token t, FILE *saida) {
+    if (t.type == TOKEN_EOF) return;
+
+    char buffer[256];
+
+    switch (t.type) {
+        case TOKEN_ID:
+            sprintf(buffer, "%d# IDENTIFICADOR | %d", t.line, t.attribute.table_index);
+            break;
+        case TOKEN_KEYWORD:
+            sprintf(buffer, "%d# PALAVRA_RESERVADA | 0", t.line);
+            break;
+        case TOKEN_NUM_INT:
+            sprintf(buffer, "%d# NUM_INTEIRO | %d", t.line, t.attribute.int_value);
+            break;
+        case TOKEN_NUM_FLOAT:
+            sprintf(buffer, "%d# NUM_REAL | %.2f", t.line, t.attribute.float_value);
+            break;
+        case TOKEN_OP_REL:
+            sprintf(buffer, "%d# OPERADOR_DELIMITADOR | %d", t.line, t.attribute.op_code);
+            break;
+        default:
+            sprintf(buffer, "%d# DESCONHECIDO | 0", t.line);
+            break;
+    }
+
+    // Imprime no terminal
+    printf("%s\n", buffer);
+
+    // Escreve no ficheiro .lex se estiver aberto
+    if (saida != NULL) {
+        fprintf(saida, "%s\n", buffer);
+    }
+}
 //PEGA O PROXIMO TOKEN
 void nextToken(void) {
     tokenAtual = obterToken();
+    imprimirToken(tokenAtual, arquivoSaida);
 }
 
 /*
@@ -429,7 +446,7 @@ int checarPalavraReservada(){
         nextToken();//PEGA O PROXIMO TOKEN
         return 1;
     }
-    erroSintatico("Palavra reservada");
+    erroSintatico("Não palavra reservada");
     return 0; // CASO CONTRARIO, RETONA
 }
 
@@ -462,28 +479,22 @@ int checarDelimitadorOperador(OpRelType opDe){
 void fator() {
     if (tokenAtual.type == TOKEN_NUM_INT || tokenAtual.type == TOKEN_NUM_FLOAT) {
         nextToken();
-    } else if (tokenAtual.type == TOKEN_ID) {
+    } 
+    else if (tokenAtual.type == TOKEN_ID) { // Aceita variáveis e cadeias de texto
         nextToken();
-        // Indexação de vetor [expressao] ou chamada de função (expressao, ...)
-        if (tokenAtual.type == TOKEN_OP_REL) { // representa '[', '(' se estendidos
-            nextToken();
-            expressao();
-            while (tokenAtual.type == TOKEN_OP_REL) { // ','
-                nextToken();
-                expressao();
-            }
-            nextToken(); // consome ']' ou ')'
-        }
-    } else if (tokenAtual.type == TOKEN_KEYWORD) { // verdadeiro, falso
+    } 
+    else if (tokenAtual.type == TOKEN_KEYWORD) { // Para 'verdadeiro' ou 'falso'
         nextToken();
-    } else if (tokenAtual.type == TOKEN_OP_REL) { // '(' ou '-' unário
-        nextToken();
-        if (tokenAtual.type != TOKEN_EOF) {
-            expressao();
+    } 
+    else if (tokenAtual.type == TOKEN_OP_REL) { // Para expressões entre parênteses '('
+        nextToken(); // consome '('
+        expressao();
+        if (tokenAtual.type == TOKEN_OP_REL) {
             nextToken(); // consome ')'
         }
-    } else {
-        erroSintatico("fator valido (numero, ID, expressao ou valor logico)");
+    } 
+    else {
+        erroSintatico("fator valido");
     }
 }
 
@@ -574,16 +585,22 @@ void leitura() {
 
 // [X] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
 void escrita() {
-    checarPalavraReservada(); // consome 'escreva' ou 'escreval'
-    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
-    
-    expressao();
-    while (tokenAtual.type == TOKEN_OP_REL) { // enquanto houver vírgula ','
-        nextToken(); // consome ','
+    checarPalavraReservada(); // Consome 'escreva' ou 'escreval'
+
+    if (tokenAtual.type == TOKEN_OP_REL) { // Consome '('
+        nextToken();
+    }
+
+    expressao(); // Consome a string/expressão
+
+    while (tokenAtual.type == TOKEN_OP_REL) { // Consome ',' se houver
+        nextToken();
         expressao();
     }
-    
-    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+
+    if (tokenAtual.type == TOKEN_OP_REL) { // Consome ')'
+        nextToken();
+    }
 }
 
 // [X] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
@@ -689,18 +706,31 @@ void retorno() {
 */
 void comando() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
-        // Identifica o comando através das palavras reservadas
-        // (Nota: em um compilador completo, faz-se um switch/if verificando qual keyword é)
-        leitura(); // ou escrita(), condicional(), repeticaoPara(), etc.
+        // Como o tokenAtual é uma palavra reservada, verifica o fluxo adequado:
+        // Exemplo: se, para, enquanto, leia, escreva, retorne
+        if (strcmp(lexemaAtual, "leia") == 0) {
+            leitura();
+        } else if (strcmp(lexemaAtual, "escreva") == 0 || strcmp(lexemaAtual, "escreval") == 0) {
+            escrita();
+        } else if (strcmp(lexemaAtual, "se") == 0) {
+            condicional();
+        } else if (strcmp(lexemaAtual, "para") == 0) {
+            repeticaoPara();
+        } else if (strcmp(lexemaAtual, "enquanto") == 0) {
+            repeticaoEnquanto();
+        } else if (strcmp(lexemaAtual, "retorne") == 0) {
+            retorno();
+        } else {
+            // Procedimento sem parâmetros ou palavra reservada de bloco
+            nextToken();
+        }
     } 
     else if (tokenAtual.type == TOKEN_ID) {
-        // Como 'atribuicao' e 'chamada' começam com TOKEN_ID,
-        // a rotina atribuição trata ambos os fluxos (id <- exp ou id[exp] <- exp).
-        // Se não houver '<-', funciona como chamada.
+        // Atribuição (ex: x <- 10 ou vet[1] <- 5) ou chamada de função/procedimento
         atribuicao();
     } 
     else {
-        erroSintatico("comando valido (atribuicao, leitura, escrita, condicional, repeticao ou chamada)");
+        erroSintatico("Comando inválido encontrado");
     }
 }
 
@@ -782,19 +812,30 @@ void parametros() {
 
 // declaracao_var -> var declaracao_lista+
 void declaracaoVar() {
-    checarPalavraReservada(); // 'var'
+    // checarPalavraReservada(); // 'var'
+
+    // while (tokenAtual.type == TOKEN_ID) {
+    //     // id_lista -> id (',' id)*
+    //     casaToken(TOKEN_ID);
+        
+    //     while (tokenAtual.type == TOKEN_OP_REL) { // vírgula ','
+    //         nextToken();
+    //         casaToken(TOKEN_ID);
+    //     }
+
+    //     // Consome ':' e o tipo
+    //     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
+    //     tipoBase();
+    // }
+    checarPalavraReservada(); // Consome 'var'
 
     while (tokenAtual.type == TOKEN_ID) {
-        // id_lista -> id (',' id)*
         casaToken(TOKEN_ID);
-        
-        while (tokenAtual.type == TOKEN_OP_REL) { // vírgula ','
+        while (tokenAtual.type == TOKEN_OP_REL) { // Se houver vírgula
             nextToken();
             casaToken(TOKEN_ID);
         }
-
-        // Consome ':' e o tipo
-        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
+        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // Consome ':'
         tipoBase();
     }
 }
@@ -850,42 +891,38 @@ void declaracaoFuncao() {
 */
 // algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
 void algoritmo() {
-    // 1. Espera 'algoritmo'
-    checarPalavraReservada();
-
-    // 2. Espera nome do algoritmo (ID ou CADEIA)
-    if (tokenAtual.type == TOKEN_ID) {
-        casaToken(TOKEN_ID);
-    }
-
-    // 3. Bloco de Declarações (var, procedimento, funcao)
-    while (tokenAtual.type == TOKEN_KEYWORD) {
-        // Se for 'inicio', encerra a fase de declarações e vai para o corpo
-        // (Como não modificamos o léxico, o próximo TOKEN_KEYWORD indica var/procedimento/funcao ou inicio)
-        if (tokenAtual.type == TOKEN_KEYWORD) {
-            // Se o token for 'var', 'procedimento' ou 'funcao'
-            declaracaoVar();
-        } else {
-            break;
-        }
-    }
-
-    // 4. Espera 'inicio'
-    checarPalavraReservada();
-
-    // 5. Bloco de Comandos
+    // Permite processar múltiplos algoritmos presentes no mesmo arquivo fonte
     while (tokenAtual.type != TOKEN_EOF) {
-        if (tokenAtual.type == TOKEN_KEYWORD || tokenAtual.type == TOKEN_ID) {
+        // Procura início de um algoritmo
+        if (tokenAtual.type == TOKEN_KEYWORD) {
+            checarPalavraReservada(); // Consome 'algoritmo' ou palavra reservada inicial
+            
+            if (tokenAtual.type == TOKEN_ID) {
+                casaToken(TOKEN_ID); // Consome nome do algoritmo/função/procedimento
+            }
+        }
+
+        // Processa declaração var se existir
+        if (tokenAtual.type == TOKEN_KEYWORD) {
+            declaracaoVar();
+        }
+
+        // Processa início se existir
+        if (tokenAtual.type == TOKEN_KEYWORD) {
+            nextToken(); // Consome 'inicio'
+        }
+
+        // Bloco de comandos do algoritmo
+        while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
             comando();
-        } else {
-            break;
+        }
+
+        // Se encontrou fimalgoritmo, consome e avança para o próximo
+        if (tokenAtual.type == TOKEN_KEYWORD) {
+            nextToken(); // Consome 'fimalgoritmo' / 'fimprocedimento' / 'fimfuncao'
         }
     }
-
-    // 6. Espera 'fimalgoritmo'
-    checarPalavraReservada();
 }
-
 void declaracao() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
         // Verifica qual o tipo de declaração com base na palavra reservada
@@ -931,17 +968,20 @@ void analisadorSintatico(FILE *arq) {
     nextToken(); // Carrega o primeiro token (lookahead)
     algoritmo();
 
-    while (tokenAtual.type != TOKEN_EOF) {
-        printf("[Parser Lookahead] Linha %d | Type: %d\n", tokenAtual.line, tokenAtual.type);
-        nextToken();
-    }
+    // while (tokenAtual.type != TOKEN_EOF) {
+    //     printf("[Parser Lookahead] Linha %d | Type: %d\n", tokenAtual.line, tokenAtual.type);
+    //     nextToken();
+    // }
 
     fecharAnalisador();
+    printf("compilou\n");
 }
 
 // esse main() aqui é só pra eu conseguir testar se o lexico tá funcionando.
 // ainda não é a versão final (falta formatar do jeito que o item 5 pede
 // e salvar num arquivo de log)
+FILE *arquivoSaida = NULL;
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
@@ -954,11 +994,19 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Criar arquivo de saída com a extensão .lex
+    char nomeSaida[256];
+    sprintf(nomeSaida, "%s.lex", argv[1]);
+    arquivoSaida = fopen(nomeSaida, "w");
+
     analisadorSintatico(arq);
+
+    if (arquivoSaida != NULL) {
+        fclose(arquivoSaida);
+    }
 
     return 0;
 }
-
 // int main(int argc, char *argv[]) {
 //     if (argc < 2) {
 //         fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
