@@ -255,6 +255,45 @@ Token proximoToken() {
         token.attribute.op_code = OP_EQ;
         return token;
     }
+    // Adicione no proximoToken() antes do erro léxico:
+    if (c == '"') {
+        char lexema[MAX_LEXEMA];
+        int i = 0;
+
+        // Consome caracteres até encontrar a aspa de fechamento ou fim de linha/arquivo
+        while ((c = fgetc(fonte)) != EOF && c != '"' && c != '\n') {
+            if (i < MAX_LEXEMA - 1) {
+                lexema[i++] = (char)c;
+            }
+        }
+
+        if (c != '"') {
+            // String não foi fechada antes do fim da linha ou arquivo
+            erroLexico("Cadeia de texto nao fechada");
+        }
+
+        lexema[i] = '\0'; // Finaliza a string em C
+
+        token.type = TOKEN_ID; // ou o tipo correspondente a texto na sua estrutura
+        
+        // AQUI USAMOS O LEXEMA PARA O ERRO SUMIR:
+        token.attribute.table_index = inserirTabelaSimbolos(lexema);
+        token.line = linhaAtual;
+
+        return token;
+    }
+    // Tratamento dos parênteses no proximoToken()
+    if (c == '(') {
+        token.type = TOKEN_OP_REL; // Ou um tipo delimitador, se tiver na sua struct/enum
+        token.line = linhaAtual;
+        return token;
+    }
+
+    if (c == ')') {
+        token.type = TOKEN_OP_REL; // Ou um tipo delimitador
+        token.line = linhaAtual;
+        return token;
+    }
 
     // qualquer outra coisa (aspas, +, -, :, etc.) eu ainda não sei
     // classificar com o struct que a gente tem, então cai aqui como erro
@@ -420,7 +459,7 @@ int checarDelimitadorOperador(OpRelType opDe){
            | num_int | num_real | cadeia | verdadeiro | falso
 */
 // fator -> '(' expressao ')' | '-' fator | id ('[' expressao ']' | '(' (expressao (',' expressao)*)? ')')? | num_int | num_real | cadeia | verdadeiro | falso
-void fator(void) {
+void fator() {
     if (tokenAtual.type == TOKEN_NUM_INT || tokenAtual.type == TOKEN_NUM_FLOAT) {
         nextToken();
     } else if (tokenAtual.type == TOKEN_ID) {
@@ -449,7 +488,7 @@ void fator(void) {
 }
 
 // termo -> fator (('*' | '/' | '\' | MOD) fator)*
-void termo(void) {
+void termo() {
     fator();
     while (tokenAtual.type == TOKEN_KEYWORD /* MOD */ || tokenAtual.type == TOKEN_OP_REL /* *, / */) {
         nextToken();
@@ -458,7 +497,7 @@ void termo(void) {
 }
 
 // expressao_arit -> termo (('+' | '-') termo)*
-void expressaoAritmetica(void) {
+void expressaoAritmetica() {
     termo();
     while (tokenAtual.type == TOKEN_OP_REL /* +, - */) {
         nextToken();
@@ -467,7 +506,7 @@ void expressaoAritmetica(void) {
 }
 
 // expressao_rel -> expressao_arit (opReal expressao_arit)?
-void expressaoRelacional(void) {
+void expressaoRelacional() {
     expressaoAritmetica();
     if (tokenAtual.type == TOKEN_OP_REL) {
         nextToken(); // consome <, <=, =, >, >=
@@ -476,7 +515,7 @@ void expressaoRelacional(void) {
 }
 
 // expressao -> expressao_e (OU expressao_e)*
-void expressao(void) {
+void expressao() {
     expressaoRelacional();
     while (tokenAtual.type == TOKEN_KEYWORD /* E, OU */) {
         nextToken();
@@ -503,7 +542,7 @@ void expressao(void) {
 
 
 // [X] variavel -> id ('[' expressao ']')?
-void variavel(void) {
+void variavel() {
     casaToken(TOKEN_ID);
     
     // Se o próximo token for '[' (tratado como operador/delimitador)
@@ -515,7 +554,7 @@ void variavel(void) {
 }
 
 // [X] atribuicao -> variavel '<-' expressao
-void atribuicao(void) {
+void atribuicao() {
     variavel();
     if (tokenAtual.type == TOKEN_OP_REL) {
         nextToken(); // consome '<-'
@@ -524,7 +563,7 @@ void atribuicao(void) {
 }
 
 // [X] leitura -> leia '(' variavel ')'
-void leitura(void) {
+void leitura() {
     checarPalavraReservada(); // consome 'leia'
     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
     
@@ -534,7 +573,7 @@ void leitura(void) {
 }
 
 // [X] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
-void escrita(void) {
+void escrita() {
     checarPalavraReservada(); // consome 'escreva' ou 'escreval'
     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
     
@@ -548,7 +587,7 @@ void escrita(void) {
 }
 
 // [X] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
-void condicional(void) {
+void condicional() {
     checarPalavraReservada(); // consome 'se'
     
     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
@@ -575,7 +614,7 @@ void condicional(void) {
 }
 
 // [X] repeticao_para -> para id de expressao ate expressao (passo expressao)? faca comando* fimpara
-void repeticaoPara(void) {
+void repeticaoPara() {
     checarPalavraReservada(); // consome 'para'
     casaToken(TOKEN_ID);
     checarPalavraReservada(); // consome 'de'
@@ -602,7 +641,7 @@ void repeticaoPara(void) {
 }
 
 // [X] repeticao_enquanto -> enquanto '(' expressao ')' faca comando* fimenquanto
-void repeticaoEnquanto(void) {
+void repeticaoEnquanto() {
     checarPalavraReservada(); // consome 'enquanto'
     
     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
@@ -620,7 +659,7 @@ void repeticaoEnquanto(void) {
 }
 
 // [X] chamada -> id ('(' (expressao (',' expressao)*)? ')')?
-void chamada(void) {
+void chamada() {
     casaToken(TOKEN_ID);
     
     if (tokenAtual.type == TOKEN_OP_REL) { // '('
@@ -640,7 +679,7 @@ void chamada(void) {
 }
 
 // [X] retorno -> retorne expressao
-void retorno(void) {
+void retorno() {
     checarPalavraReservada(); // consome 'retorne'
     expressao();
 }
@@ -648,7 +687,7 @@ void retorno(void) {
 /*
 [X] Decisão para diferenciar atribuição de chamada quando ambos começam com ID:
 */
-void comando(void) {
+void comando() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
         // Identifica o comando através das palavras reservadas
         // (Nota: em um compilador completo, faz-se um switch/if verificando qual keyword é)
@@ -678,12 +717,12 @@ void comando(void) {
 [X] parametro -> id ':' tipo_base
 */
 // tipo_base -> inteiro | real | caractere | logico
-void tipoBase(void) {
+void tipoBase() {
     checarPalavraReservada();
 }
 
 // tipo -> tipo_base | vetor '[' num_int '..' num_int ']' de tipo_base
-void tipo(void) {
+void tipo() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
         checarPalavraReservada(); // tipo_base ou 'vetor'
         if (tokenAtual.type == TOKEN_OP_REL) { // '[' de vetor
@@ -698,7 +737,7 @@ void tipo(void) {
     }
 }
 
-void idLista(void) {
+void idLista() {
     // Consome o primeiro ID
     casaToken(TOKEN_ID);
 
@@ -710,7 +749,7 @@ void idLista(void) {
 }
 
 // [x] declaracao_lista -> id_lista ':' tipo
-void declaracaoLista(void) {
+void declaracaoLista() {
     // 1. Processa a lista de identificadores (ex: x, y, z)
     idLista();
 
@@ -726,14 +765,14 @@ void declaracaoLista(void) {
 }
 
 // parametro -> id ':' tipo_base
-void parametro(void) {
+void parametro() {
     casaToken(TOKEN_ID);
     if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
     tipoBase();
 }
 
 // parametros -> parametro (',' parametro)*
-void parametros(void) {
+void parametros() {
     parametro();
     while (tokenAtual.type == TOKEN_OP_REL) { // ','
         nextToken();
@@ -742,28 +781,26 @@ void parametros(void) {
 }
 
 // declaracao_var -> var declaracao_lista+
-void declaracaoVar(void) {
+void declaracaoVar() {
     checarPalavraReservada(); // 'var'
 
-    do {
+    while (tokenAtual.type == TOKEN_ID) {
         // id_lista -> id (',' id)*
         casaToken(TOKEN_ID);
-        while (tokenAtual.type == TOKEN_OP_REL) { // ','
+        
+        while (tokenAtual.type == TOKEN_OP_REL) { // vírgula ','
             nextToken();
             casaToken(TOKEN_ID);
         }
 
-        // ':'
-        if (tokenAtual.type == TOKEN_OP_REL) nextToken();
-
-        // tipo
-        tipo();
-
-    } while (tokenAtual.type == TOKEN_ID);
+        // Consome ':' e o tipo
+        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
+        tipoBase();
+    }
 }
 
 // declaracao_procedimento -> procedimento id ('(' parametros ')')? inicio comando* fimprocedimento
-void declaracaoProcedimento(void) {
+void declaracaoProcedimento() {
     checarPalavraReservada(); // 'procedimento'
     casaToken(TOKEN_ID);
 
@@ -785,7 +822,7 @@ void declaracaoProcedimento(void) {
 }
 
 // declaracao_funcao -> funcao id '(' parametros? ')' ':' tipo_base inicio comando* fimfuncao
-void declaracaoFuncao(void) {
+void declaracaoFuncao() {
     checarPalavraReservada(); // 'funcao'
     casaToken(TOKEN_ID);
 
@@ -812,7 +849,7 @@ void declaracaoFuncao(void) {
 [ ] declaracao -> declaracao_var | declaracao_procedimento | declaracao_funcao
 */
 // algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
-void algoritmo(void) {
+void algoritmo() {
     // 1. Espera 'algoritmo'
     checarPalavraReservada();
 
@@ -849,7 +886,7 @@ void algoritmo(void) {
     checarPalavraReservada();
 }
 
-void declaracao(void) {
+void declaracao() {
     if (tokenAtual.type == TOKEN_KEYWORD) {
         // Verifica qual o tipo de declaração com base na palavra reservada
         // (Nota: em C, você pode comparar com a palavra do lexema ou tabela de símbolos)
