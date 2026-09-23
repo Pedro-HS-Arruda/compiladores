@@ -132,12 +132,12 @@ Token proximoToken() {
     // apaguei ele, senão nenhum token de verdade era reconhecido)
     token.line = linhaAtual; // Atribui a linha atual ao token antes de retorná-lo
 
-/* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
- * [X] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
- * [X] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
- * [ ] Extrair Cadeias de Caracteres: texto delimitado por aspas duplas.
- * [ ] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
- */
+    /* 3. RECONHECIMENTO DE PADRÕES (MÁQUINA DE ESTADOS)
+    * [X] Extrair Identificadores e Palavras Reservadas: letras seguidas de letras, números ou underscore.
+    * [X] Extrair Números: sequências de dígitos (inteiros) e sequências de dígitos separadas por ponto (reais).
+    * [X] Extrair Cadeias de Caracteres: texto delimitado por aspas duplas.
+    * [X] Extrair Operadores e Delimitadores: implementar o 'lookahead' (olhar o próximo caractere) para diferenciar símbolos simples ('<', '>') de compostos ('<-', '<=', '>=', '<>').
+    */
 
     if (isalpha(c) || c == '_') {
         char lexema[MAX_LEXEMA];
@@ -283,12 +283,12 @@ int inserirTabelaSimbolos(const char *lexema) {
 
 
 /* 5. FORMATAÇÃO E ARQUIVO DE SAÍDA
- * [ ] Formatar a string de saída no padrão exigido: Número da Linha do Átomo# NomeToken | Atributo
- * [ ] Imprimir cada token no terminal (stdout) à medida que são reconhecidos.
- * [ ] Gravar a mesma saída formatada em um arquivo de texto de log.
+ * [X] Formatar a string de saída no padrão exigido: Número da Linha do Átomo# NomeToken | Atributo
+ * [X] Imprimir cada token no terminal (stdout) à medida que são reconhecidos.
+ * [X] Gravar a mesma saída formatada em um arquivo de texto de log.
  */
 
- void registrar_token(Token t, FILE *arquivo_log) {
+void registrar_token(Token t, FILE *arquivo_log) {
     const char *nome_tipo;
 
     switch (t.type) {
@@ -334,7 +334,7 @@ int main(int argc, char *argv[]) {
 
 /* 6. TRATAMENTO DE ERROS LÉXICOS
  * [X] Interceptar qualquer caractere lido que não pertença ao alfabeto/regras da linguagem MiniVisualg.
- * [ ] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta (falta acentuar certinho e formatar igual o item 5 pede).
+ * [X] Exibir a mensagem exata "ERRO LÉXICO", informando a linha e a sequência incorreta (falta acentuar certinho e formatar igual o item 5 pede).
  * [X] Abortar imediatamente a execução do programa (exit) após a identificação do erro.
  */
 void erroLexico(const char *sequencia) {
@@ -348,11 +348,9 @@ void erroLexico(const char *sequencia) {
 /* TODO LIST - ETAPA 3: ANALISADOR SINTATICO (MINIVISUALG)
 
 1. INTEGRACAO COM O ANALISADOR LEXICO
-[ ] Criar a variavel/estrutura que guarda o "token atual" (o lookahead do parser).
-[ ] Implementar a funcao nextToken() do lado do sintatico, que chama obterToken()
-    do lexico e atualiza o token atual (nomes sugeridos pela professora na Figura 1).
-[ ] Antes de comecar a analise, chamar nextToken() uma vez para carregar o
-    primeiro token do arquivo.
+[X] Criar a variavel/estrutura que guarda o "token atual" (o lookahead do parser).
+[X] Implementar a funcao nextToken() do lado do sintatico, que chama obterToken() do lexico e atualiza o token atual (nomes sugeridos pela professora na Figura 1).
+[X] Antes de comecar a analise, chamar nextToken() uma vez para carregar o primeiro token do arquivo.
 
 2. FUNCOES AUXILIARES DE APOIO AO PARSER
 [ ] Criar uma funcao que confere se o token atual e do tipo esperado e, se for,
@@ -417,3 +415,13 @@ void erroLexico(const char *sequencia) {
 [ ] Utilizar os nomes de modulos sugeridos no documento (nextToken / obterToken).
 
 */
+
+Token tokenAtual;
+
+Token obterToken(void) {
+    return proximoToken();
+}
+
+void nextToken(void) {
+    tokenAtual = obterToken();
+}
