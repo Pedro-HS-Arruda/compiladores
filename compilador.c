@@ -39,6 +39,35 @@ typedef struct {
 
 } Token;
 
+void erroSintatico(const char *msg); 
+void nextToken(); 
+void expressao(); 
+void expressaoRelacional(); 
+void expressaoAritmetica(); 
+void termo(); 
+void fator(); 
+void variavel(); 
+void atribuicao();
+void leitura(); 
+void escrita(); 
+void condicional(); 
+void repeticaoPara(); 
+void repeticaoEnquanto(); 
+void chamada(); 
+void retorno(); 
+void comando(); 
+void tipoBase(); 
+void tipo(); 
+void idLista(); 
+void declaracaoLista(); 
+void parametro(); 
+void parametros(); 
+void declaracaoVar(); 
+void declaracaoProcedimento(); 
+void declaracaoFuncao(); 
+void algoritmo(); 
+void declaracao();
+
 
 /*
  * TODO LIST - ETAPA 2: ANALISADOR LÉXICO (MINIVISUALG)
@@ -344,7 +373,7 @@ void nextToken(void) {
 [X] Criar uma funcao que confere se o token atual e um delimitador ou operador especifico (ex: '(', ')', ':', ',').
 */
 //OLHA SE É O TOKEN ATUAL É O TIPO ESPERADO
-int caseToken(TokenNome tipoEsperado){
+int casaToken(TokenNome tipoEsperado){
     if (tokenAtual.type == tipoEsperado){
         nextToken();
         return 1;
@@ -368,7 +397,7 @@ int checarPalavraReservada(){
 //VERIFICA SE O TOKEN ATUAL É UM DELIMITADOR OU OPERADOR ESPECIFICO
 int checarDelimitadorOperador(OpRelType opDe){
     if(tokenAtual.type == TOKEN_OP_REL){ // SE O TOKEN ATUAL FOR UM OPERADOR RELACIONAL
-        if(tokenAtual.attribute.op_code = opDe){ // SE TOKEN ATUAL FOR UM OPERADOR
+        if(tokenAtual.attribute.op_code == opDe){ // SE TOKEN ATUAL FOR UM OPERADOR
             nextToken(); // PEGA O PROXIMO TOKEN
             return 1;
         }
@@ -471,57 +500,7 @@ void expressao(void) {
 [X] Decidir como diferenciar atribuicao de chamada quando os dois comecam com id (olhar o que vem depois do id: '<-', '[', '(' ou nenhum desses).
 */
 // Protótipos das funções de comandos e expressões
-void comando(void) {
-    if (tokenAtual.type == TOKEN_KEYWORD) {
-        // Comandos estruturados: leia, escreva, se, enquanto, para, retorne
-        nextToken(); // consome a palavra reservada inicial
-        
-        // Trata parênteses de comandos como leia(...), escreva(...), se(...), enquanto(...)
-        if (tokenAtual.type == TOKEN_OP_REL) { // '('
-            nextToken(); 
-            expressao();
-            while (tokenAtual.type == TOKEN_OP_REL) { // ','
-                nextToken();
-                expressao();
-            }
-            if (tokenAtual.type == TOKEN_OP_REL) { // ')'
-                nextToken();
-            }
-        } else if (tokenAtual.type == TOKEN_ID || tokenAtual.type == TOKEN_NUM_INT) {
-            expressao();
-        }
 
-        // Blocos internos de comandos (se/entao, enquanto/faca, para/faca)
-        while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
-            // Caso contenha comandos internos antes de fechar o bloco (fimse, fimenquanto, etc)
-            if (tokenAtual.type == TOKEN_ID || tokenAtual.type == TOKEN_KEYWORD) {
-                comando();
-            } else {
-                break;
-            }
-        }
-    } else if (tokenAtual.type == TOKEN_ID) {
-        // Diferenciação entre Atribuição (id <- exp ou id[exp] <- exp) e Chamada de Procedimento (id())
-        casaToken(TOKEN_ID);
-
-        // Se houver indexador de vetor: id[expressao]
-        if (tokenAtual.type == TOKEN_OP_REL) { 
-            nextToken(); // consome '[' ou '('
-            expressao();
-            if (tokenAtual.type == TOKEN_OP_REL) {
-                nextToken(); // consome ']' ou ')'
-            }
-        }
-
-        // Se for atribuição ('<-')
-        if (tokenAtual.type == TOKEN_OP_REL) {
-            nextToken(); // consome '<-'
-            expressao();
-        }
-    } else {
-        erroSintatico("comando valido");
-    }
-}
 
 // [X] variavel -> id ('[' expressao ']')?
 void variavel(void) {
@@ -891,9 +870,9 @@ void declaracao(void) {
 7. TRATAMENTO DE ERROS SINTATICOS
 [X] Interceptar qualquer token que nao bata com o que a gramatica esperava naquele ponto da analise.
 [X] Exibir a mensagem exata "ERRO SINTATICO", informando o token incorreto e a linha do codigo fonte correspondente.
-[ ] Abortar imediatamente a execucao do programa (exit) apos identificar o erro.
+[X] Abortar imediatamente a execucao do programa (exit) apos identificar o erro.
 */
-void erroSintatico(char msg[MAX_LEXEMA]){
+void erroSintatico(const char *msg){
     fprintf(stderr, "ERRO SINTATICO na linha %d: %s\n", tokenAtual.line, msg);
 
     fecharAnalisador();
