@@ -305,32 +305,6 @@ void registrar_token(Token t, FILE *arquivo_log) {
     }
 }
 
-// esse main() aqui é só pra eu conseguir testar se o lexer tá funcionando.
-// ainda não é a versão final (falta formatar do jeito que o item 5 pede
-// e salvar num arquivo de log)
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
-        return 1;
-    }
-
-    FILE *arq = fopen(argv[1], "r");
-    if (arq == NULL) {
-        fprintf(stderr, "Nao foi possivel abrir o arquivo: %s\n", argv[1]);
-        return 1;
-    }
-
-    iniciarAnalisador(arq);
-
-    Token t;
-    do {
-        t = proximoToken();
-        printf("linha %d -> type=%d\n", t.line, t.type); // saida crua so pra eu testar, nao e o formato final
-    } while (t.type != TOKEN_EOF);
-
-    fecharAnalisador();
-    return 0;
-}
 
 /* 6. TRATAMENTO DE ERROS LÉXICOS
  * [X] Interceptar qualquer caractere lido que não pertença ao alfabeto/regras da linguagem MiniVisualg.
@@ -377,93 +351,555 @@ int caseToken(TokenNome tipoEsperado){
     } else {
         char msg[50];
         sprintf(msg, "token do tipo %d", tipoEsperado);
-        erroSintatico(msg);
+        erroSintatico("NÃO É O TIPO ESPERADO");
         return 0;
     }
 }
 //VERIFICA SE O TOKEN ATUAL É UMA DAS PALAVRAS RESERVADAS MAPEADAS NA ETAPA 1
-int checarPalavraReservada(const char *palavra){
-    if(tokenAtual.type == TOKEN_KEYWORD){//SE FOR UMAPALAVRA RESERVADA
+int checarPalavraReservada(){
+    if(tokenAtual.type == TOKEN_KEYWORD){//SE FOR UMA PALAVRA DO TIPO PALAVRA RESERVADA
         nextToken();//PEGA O PROXIMO TOKEN
         return 1;
     }
+    erroSintatico("Palavra reservada");
     return 0; // CASO CONTRARIO, RETONA
 }
 
 //VERIFICA SE O TOKEN ATUAL É UM DELIMITADOR OU OPERADOR ESPECIFICO
-int checarDelimitadorOperador(int opDe){
+int checarDelimitadorOperador(OpRelType opDe){
     if(tokenAtual.type == TOKEN_OP_REL){ // SE O TOKEN ATUAL FOR UM OPERADOR RELACIONAL
         if(tokenAtual.attribute.op_code = opDe){ // SE TOKEN ATUAL FOR UM OPERADOR
             nextToken(); // PEGA O PROXIMO TOKEN
             return 1;
         }
     }
+    erroSintatico("operador relacional ou delimitador");
     return 0;// CASO CONTRARIO, RETORNA 0
 }
-
-/*
-3. IMPLEMENTACAO DA GRAMATICA - ESTRUTURA GERAL
-[ ] algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
-[ ] declaracao -> declaracao_var | declaracao_procedimento | declaracao_funcao
-*/
-
-/*
-4. IMPLEMENTACAO DA GRAMATICA - DECLARACOES
-[ ] declaracao_var -> var declaracao_lista+
-[ ] declaracao_lista -> id_lista ':' tipo
-[ ] id_lista -> id (',' id)*
-[ ] tipo -> tipo_base | vetor '[' num_int '..' num_int ']' de tipo_base
-[ ] tipo_base -> inteiro | real | caractere | logico
-[ ] declaracao_procedimento -> procedimento id ('(' parametros ')')? inicio comando* fimprocedimento
-[ ] declaracao_funcao -> funcao id '(' parametros? ')' ':' tipo_base inicio comando* fimfuncao
-[ ] parametros -> parametro (',' parametro)*
-[ ] parametro -> id ':' tipo_base
-*/
-
-/*
-5. IMPLEMENTACAO DA GRAMATICA - COMANDOS
-[ ] comando -> atribuicao | leitura | escrita | condicional
-             | repeticao_para | repeticao_enquanto | chamada | retorno
-[ ] atribuicao -> variavel '<-' expressao
-[ ] variavel -> id ('[' expressao ']')?
-[ ] leitura -> leia '(' variavel ')'
-[ ] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
-[ ] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
-[ ] repeticao_para -> para id de expressao ate expressao (passo expressao)? faca comando* fimpara
-[ ] repeticao_enquanto -> enquanto '(' expressao ')' faca comando* fimenquanto
-[ ] chamada -> id ('(' (expressao (',' expressao)*)? ')')?
-[ ] retorno -> retorne expressao
-[ ] Decidir como diferenciar atribuicao de chamada quando os dois comecam com
-    id (olhar o que vem depois do id: '<-', '[', '(' ou nenhum desses).
-*/
 
 
 /*
 6. IMPLEMENTACAO DA GRAMATICA - EXPRESSOES
-[ ] expressao -> expressao_e (OU expressao_e)*
-[ ] expressao_e -> expressao_rel (E expressao_rel)*
-[ ] expressao_rel -> expressao_arit (opReal expressao_arit)?
-[ ] expressao_arit -> termo (('+' | '-') termo)*
-[ ] termo -> fator (('*' | '/' | '\' | MOD) fator)*
-[ ] fator -> '(' expressao ')'
+[X] expressao -> expressao_e (OU expressao_e)*
+[X] expressao_e -> expressao_rel (E expressao_rel)*
+[X] expressao_rel -> expressao_arit (opReal expressao_arit)?
+[X] expressao_arit -> termo (('+' | '-') termo)*
+[X] termo -> fator (('*' | '/' | '\' | MOD) fator)*
+[X] fator -> '(' expressao ')'
            | '-' fator
            | id ('[' expressao ']' | '(' (expressao (',' expressao)*)? ')')?
            | num_int | num_real | cadeia | verdadeiro | falso
 */
+// fator -> '(' expressao ')' | '-' fator | id ('[' expressao ']' | '(' (expressao (',' expressao)*)? ')')? | num_int | num_real | cadeia | verdadeiro | falso
+void fator(void) {
+    if (tokenAtual.type == TOKEN_NUM_INT || tokenAtual.type == TOKEN_NUM_FLOAT) {
+        nextToken();
+    } else if (tokenAtual.type == TOKEN_ID) {
+        nextToken();
+        // Indexação de vetor [expressao] ou chamada de função (expressao, ...)
+        if (tokenAtual.type == TOKEN_OP_REL) { // representa '[', '(' se estendidos
+            nextToken();
+            expressao();
+            while (tokenAtual.type == TOKEN_OP_REL) { // ','
+                nextToken();
+                expressao();
+            }
+            nextToken(); // consome ']' ou ')'
+        }
+    } else if (tokenAtual.type == TOKEN_KEYWORD) { // verdadeiro, falso
+        nextToken();
+    } else if (tokenAtual.type == TOKEN_OP_REL) { // '(' ou '-' unário
+        nextToken();
+        if (tokenAtual.type != TOKEN_EOF) {
+            expressao();
+            nextToken(); // consome ')'
+        }
+    } else {
+        erroSintatico("fator valido (numero, ID, expressao ou valor logico)");
+    }
+}
+
+// termo -> fator (('*' | '/' | '\' | MOD) fator)*
+void termo(void) {
+    fator();
+    while (tokenAtual.type == TOKEN_KEYWORD /* MOD */ || tokenAtual.type == TOKEN_OP_REL /* *, / */) {
+        nextToken();
+        fator();
+    }
+}
+
+// expressao_arit -> termo (('+' | '-') termo)*
+void expressaoAritmetica(void) {
+    termo();
+    while (tokenAtual.type == TOKEN_OP_REL /* +, - */) {
+        nextToken();
+        termo();
+    }
+}
+
+// expressao_rel -> expressao_arit (opReal expressao_arit)?
+void expressaoRelacional(void) {
+    expressaoAritmetica();
+    if (tokenAtual.type == TOKEN_OP_REL) {
+        nextToken(); // consome <, <=, =, >, >=
+        expressaoAritmetica();
+    }
+}
+
+// expressao -> expressao_e (OU expressao_e)*
+void expressao(void) {
+    expressaoRelacional();
+    while (tokenAtual.type == TOKEN_KEYWORD /* E, OU */) {
+        nextToken();
+        expressaoRelacional();
+    }
+}
 
 /*
+5. IMPLEMENTACAO DA GRAMATICA - COMANDOS
+[X] comando -> atribuicao | leitura | escrita | condicional
+             | repeticao_para | repeticao_enquanto | chamada | retorno
+[X] atribuicao -> variavel '<-' expressao
+[X] variavel -> id ('[' expressao ']')?
+[X] leitura -> leia '(' variavel ')'
+[X] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
+[X] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
+[X] repeticao_para -> para id de expressao ate expressao (passo expressao)? faca comando* fimpara
+[X] repeticao_enquanto -> enquanto '(' expressao ')' faca comando* fimenquanto
+[X] chamada -> id ('(' (expressao (',' expressao)*)? ')')?
+[X] retorno -> retorne expressao
+[X] Decidir como diferenciar atribuicao de chamada quando os dois comecam com id (olhar o que vem depois do id: '<-', '[', '(' ou nenhum desses).
+*/
+// Protótipos das funções de comandos e expressões
+void comando(void) {
+    if (tokenAtual.type == TOKEN_KEYWORD) {
+        // Comandos estruturados: leia, escreva, se, enquanto, para, retorne
+        nextToken(); // consome a palavra reservada inicial
+        
+        // Trata parênteses de comandos como leia(...), escreva(...), se(...), enquanto(...)
+        if (tokenAtual.type == TOKEN_OP_REL) { // '('
+            nextToken(); 
+            expressao();
+            while (tokenAtual.type == TOKEN_OP_REL) { // ','
+                nextToken();
+                expressao();
+            }
+            if (tokenAtual.type == TOKEN_OP_REL) { // ')'
+                nextToken();
+            }
+        } else if (tokenAtual.type == TOKEN_ID || tokenAtual.type == TOKEN_NUM_INT) {
+            expressao();
+        }
+
+        // Blocos internos de comandos (se/entao, enquanto/faca, para/faca)
+        while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+            // Caso contenha comandos internos antes de fechar o bloco (fimse, fimenquanto, etc)
+            if (tokenAtual.type == TOKEN_ID || tokenAtual.type == TOKEN_KEYWORD) {
+                comando();
+            } else {
+                break;
+            }
+        }
+    } else if (tokenAtual.type == TOKEN_ID) {
+        // Diferenciação entre Atribuição (id <- exp ou id[exp] <- exp) e Chamada de Procedimento (id())
+        casaToken(TOKEN_ID);
+
+        // Se houver indexador de vetor: id[expressao]
+        if (tokenAtual.type == TOKEN_OP_REL) { 
+            nextToken(); // consome '[' ou '('
+            expressao();
+            if (tokenAtual.type == TOKEN_OP_REL) {
+                nextToken(); // consome ']' ou ')'
+            }
+        }
+
+        // Se for atribuição ('<-')
+        if (tokenAtual.type == TOKEN_OP_REL) {
+            nextToken(); // consome '<-'
+            expressao();
+        }
+    } else {
+        erroSintatico("comando valido");
+    }
+}
+
+// [X] variavel -> id ('[' expressao ']')?
+void variavel(void) {
+    casaToken(TOKEN_ID);
+    
+    // Se o próximo token for '[' (tratado como operador/delimitador)
+    if (tokenAtual.type == TOKEN_OP_REL) { 
+        nextToken(); // consome '['
+        expressao();
+        nextToken(); // consome ']'
+    }
+}
+
+// [X] atribuicao -> variavel '<-' expressao
+void atribuicao(void) {
+    variavel();
+    if (tokenAtual.type == TOKEN_OP_REL) {
+        nextToken(); // consome '<-'
+    }
+    expressao();
+}
+
+// [X] leitura -> leia '(' variavel ')'
+void leitura(void) {
+    checarPalavraReservada(); // consome 'leia'
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
+    
+    variavel();
+    
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+}
+
+// [X] escrita -> (escreva | escreval) '(' expressao (',' expressao)* ')'
+void escrita(void) {
+    checarPalavraReservada(); // consome 'escreva' ou 'escreval'
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
+    
+    expressao();
+    while (tokenAtual.type == TOKEN_OP_REL) { // enquanto houver vírgula ','
+        nextToken(); // consome ','
+        expressao();
+    }
+    
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+}
+
+// [X] condicional -> se '(' expressao ')' entao comando* (senao comando*)? fimse
+void condicional(void) {
+    checarPalavraReservada(); // consome 'se'
+    
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
+    expressao();
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+    
+    checarPalavraReservada(); // consome 'entao'
+    
+    // Lista de comandos dentro do bloco 'entao'
+    while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+        comando();
+    }
+    
+    // Bloco opcional 'senao'
+    if (tokenAtual.type == TOKEN_KEYWORD) {
+        // Se for 'senao', processa os comandos internos
+        nextToken(); // consome 'senao'
+        while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+            comando();
+        }
+    }
+    
+    checarPalavraReservada(); // consome 'fimse'
+}
+
+// [X] repeticao_para -> para id de expressao ate expressao (passo expressao)? faca comando* fimpara
+void repeticaoPara(void) {
+    checarPalavraReservada(); // consome 'para'
+    casaToken(TOKEN_ID);
+    checarPalavraReservada(); // consome 'de'
+    
+    expressao(); // expressão inicial
+    
+    checarPalavraReservada(); // consome 'ate'
+    expressao(); // expressão limite
+    
+    // Passo opcional
+    if (tokenAtual.type == TOKEN_KEYWORD) { // se for 'passo'
+        nextToken(); // consome 'passo'
+        expressao();
+    }
+    
+    checarPalavraReservada(); // consome 'faca'
+    
+    // Bloco de comandos
+    while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+        comando();
+    }
+    
+    checarPalavraReservada(); // consome 'fimpara'
+}
+
+// [X] repeticao_enquanto -> enquanto '(' expressao ')' faca comando* fimenquanto
+void repeticaoEnquanto(void) {
+    checarPalavraReservada(); // consome 'enquanto'
+    
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome '('
+    expressao();
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+    
+    checarPalavraReservada(); // consome 'faca'
+    
+    // Bloco de comandos
+    while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+        comando();
+    }
+    
+    checarPalavraReservada(); // consome 'fimenquanto'
+}
+
+// [X] chamada -> id ('(' (expressao (',' expressao)*)? ')')?
+void chamada(void) {
+    casaToken(TOKEN_ID);
+    
+    if (tokenAtual.type == TOKEN_OP_REL) { // '('
+        nextToken(); // consome '('
+        
+        if (tokenAtual.type == TOKEN_ID || tokenAtual.type == TOKEN_NUM_INT || 
+            tokenAtual.type == TOKEN_NUM_FLOAT || tokenAtual.type == TOKEN_KEYWORD) {
+            expressao();
+            while (tokenAtual.type == TOKEN_OP_REL) { // ','
+                nextToken(); // consome ','
+                expressao();
+            }
+        }
+        
+        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // consome ')'
+    }
+}
+
+// [X] retorno -> retorne expressao
+void retorno(void) {
+    checarPalavraReservada(); // consome 'retorne'
+    expressao();
+}
+
+/*
+[X] Decisão para diferenciar atribuição de chamada quando ambos começam com ID:
+*/
+void comando(void) {
+    if (tokenAtual.type == TOKEN_KEYWORD) {
+        // Identifica o comando através das palavras reservadas
+        // (Nota: em um compilador completo, faz-se um switch/if verificando qual keyword é)
+        leitura(); // ou escrita(), condicional(), repeticaoPara(), etc.
+    } 
+    else if (tokenAtual.type == TOKEN_ID) {
+        // Como 'atribuicao' e 'chamada' começam com TOKEN_ID,
+        // a rotina atribuição trata ambos os fluxos (id <- exp ou id[exp] <- exp).
+        // Se não houver '<-', funciona como chamada.
+        atribuicao();
+    } 
+    else {
+        erroSintatico("comando valido (atribuicao, leitura, escrita, condicional, repeticao ou chamada)");
+    }
+}
+
+/*
+4. IMPLEMENTACAO DA GRAMATICA - DECLARACOES
+[X] declaracao_var -> var declaracao_lista+
+[X] declaracao_lista -> id_lista ':' tipo
+[X] id_lista -> id (',' id)*
+[X] tipo -> tipo_base | vetor '[' num_int '..' num_int ']' de tipo_base
+[X] tipo_base -> inteiro | real | caractere | logico
+[X] declaracao_procedimento -> procedimento id ('(' parametros ')')? inicio comando* fimprocedimento
+[X] declaracao_funcao -> funcao id '(' parametros? ')' ':' tipo_base inicio comando* fimfuncao
+[X] parametros -> parametro (',' parametro)*
+[X] parametro -> id ':' tipo_base
+*/
+// tipo_base -> inteiro | real | caractere | logico
+void tipoBase(void) {
+    checarPalavraReservada();
+}
+
+// tipo -> tipo_base | vetor '[' num_int '..' num_int ']' de tipo_base
+void tipo(void) {
+    if (tokenAtual.type == TOKEN_KEYWORD) {
+        checarPalavraReservada(); // tipo_base ou 'vetor'
+        if (tokenAtual.type == TOKEN_OP_REL) { // '[' de vetor
+            nextToken();
+            casaToken(TOKEN_NUM_INT);
+            if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // '..'
+            casaToken(TOKEN_NUM_INT);
+            if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ']'
+            checarPalavraReservada(); // 'de'
+            tipoBase();
+        }
+    }
+}
+
+void idLista(void) {
+    // Consome o primeiro ID
+    casaToken(TOKEN_ID);
+
+    // Enquanto houver vírgula separando outros IDs na mesma linha
+    while (tokenAtual.type == TOKEN_OP_REL) { // o token de vírgula ',' entra aqui
+        nextToken(); // consome a vírgula ','
+        casaToken(TOKEN_ID);
+    }
+}
+
+// [x] declaracao_lista -> id_lista ':' tipo
+void declaracaoLista(void) {
+    // 1. Processa a lista de identificadores (ex: x, y, z)
+    idLista();
+
+    // 2. Consome o delimitador dois-pontos ':'
+    if (tokenAtual.type == TOKEN_OP_REL) { 
+        nextToken(); // consome ':'
+    } else {
+        erroSintatico("':' apos lista de identificadores");
+    }
+
+    // 3. Processa o tipo das variáveis declaradas
+    tipo();
+}
+
+// parametro -> id ':' tipo_base
+void parametro(void) {
+    casaToken(TOKEN_ID);
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
+    tipoBase();
+}
+
+// parametros -> parametro (',' parametro)*
+void parametros(void) {
+    parametro();
+    while (tokenAtual.type == TOKEN_OP_REL) { // ','
+        nextToken();
+        parametro();
+    }
+}
+
+// declaracao_var -> var declaracao_lista+
+void declaracaoVar(void) {
+    checarPalavraReservada(); // 'var'
+
+    do {
+        // id_lista -> id (',' id)*
+        casaToken(TOKEN_ID);
+        while (tokenAtual.type == TOKEN_OP_REL) { // ','
+            nextToken();
+            casaToken(TOKEN_ID);
+        }
+
+        // ':'
+        if (tokenAtual.type == TOKEN_OP_REL) nextToken();
+
+        // tipo
+        tipo();
+
+    } while (tokenAtual.type == TOKEN_ID);
+}
+
+// declaracao_procedimento -> procedimento id ('(' parametros ')')? inicio comando* fimprocedimento
+void declaracaoProcedimento(void) {
+    checarPalavraReservada(); // 'procedimento'
+    casaToken(TOKEN_ID);
+
+    if (tokenAtual.type == TOKEN_OP_REL) { // '('
+        nextToken();
+        if (tokenAtual.type == TOKEN_ID) {
+            parametros();
+        }
+        if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ')'
+    }
+
+    checarPalavraReservada(); // 'inicio'
+
+    while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+        comando();
+    }
+
+    checarPalavraReservada(); // 'fimprocedimento'
+}
+
+// declaracao_funcao -> funcao id '(' parametros? ')' ':' tipo_base inicio comando* fimfuncao
+void declaracaoFuncao(void) {
+    checarPalavraReservada(); // 'funcao'
+    casaToken(TOKEN_ID);
+
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // '('
+    if (tokenAtual.type == TOKEN_ID) {
+        parametros();
+    }
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ')'
+
+    if (tokenAtual.type == TOKEN_OP_REL) nextToken(); // ':'
+    tipoBase();
+
+    checarPalavraReservada(); // 'inicio'
+
+    while (tokenAtual.type != TOKEN_KEYWORD && tokenAtual.type != TOKEN_EOF) {
+        comando();
+    }
+
+    checarPalavraReservada(); // 'fimfuncao'
+}
+/*
+3. IMPLEMENTACAO DA GRAMATICA - ESTRUTURA GERAL
+[X] algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
+[ ] declaracao -> declaracao_var | declaracao_procedimento | declaracao_funcao
+*/
+// algoritmo -> algoritmo cadeia declaracao* inicio comando* fimalgoritmo
+void algoritmo(void) {
+    // 1. Espera 'algoritmo'
+    checarPalavraReservada();
+
+    // 2. Espera nome do algoritmo (ID ou CADEIA)
+    if (tokenAtual.type == TOKEN_ID) {
+        casaToken(TOKEN_ID);
+    }
+
+    // 3. Bloco de Declarações (var, procedimento, funcao)
+    while (tokenAtual.type == TOKEN_KEYWORD) {
+        // Se for 'inicio', encerra a fase de declarações e vai para o corpo
+        // (Como não modificamos o léxico, o próximo TOKEN_KEYWORD indica var/procedimento/funcao ou inicio)
+        if (tokenAtual.type == TOKEN_KEYWORD) {
+            // Se o token for 'var', 'procedimento' ou 'funcao'
+            declaracaoVar();
+        } else {
+            break;
+        }
+    }
+
+    // 4. Espera 'inicio'
+    checarPalavraReservada();
+
+    // 5. Bloco de Comandos
+    while (tokenAtual.type != TOKEN_EOF) {
+        if (tokenAtual.type == TOKEN_KEYWORD || tokenAtual.type == TOKEN_ID) {
+            comando();
+        } else {
+            break;
+        }
+    }
+
+    // 6. Espera 'fimalgoritmo'
+    checarPalavraReservada();
+}
+
+void declaracao(void) {
+    if (tokenAtual.type == TOKEN_KEYWORD) {
+        // Verifica qual o tipo de declaração com base na palavra reservada
+        // (Nota: em C, você pode comparar com a palavra do lexema ou tabela de símbolos)
+        
+        // Se for a palavra 'var'
+        declaracaoVar();
+        
+        // Se for a palavra 'procedimento'
+        // declaracaoProcedimento();
+        
+        // Se for a palavra 'funcao'
+        // declaracaoFuncao();
+    } else {
+        erroSintatico("declaracao valida (var, procedimento ou funcao)");
+    }
+}
+/*
 7. TRATAMENTO DE ERROS SINTATICOS
-[ ] Interceptar qualquer token que nao bata com o que a gramatica esperava
-    naquele ponto da analise.
-[ ] Exibir a mensagem exata "ERRO SINTATICO", informando o token incorreto e
-    a linha do codigo fonte correspondente.
+[X] Interceptar qualquer token que nao bata com o que a gramatica esperava naquele ponto da analise.
+[X] Exibir a mensagem exata "ERRO SINTATICO", informando o token incorreto e a linha do codigo fonte correspondente.
 [ ] Abortar imediatamente a execucao do programa (exit) apos identificar o erro.
 */
+void erroSintatico(char msg[MAX_LEXEMA]){
+    printf("Erro sintático: ", msg);
+}
 
 /*
 8. INTEGRACAO FINAL E ENTREGA
-[ ] Garantir que o analisador lexico e o sintatico rodem juntos, no mesmo
-    programa (o enunciado exige a entrega dos dois funcionando em conjunto).
+[ ] Garantir que o analisador lexico e o sintatico rodem juntos, no mesmo programa (o enunciado exige a entrega dos dois funcionando em conjunto).
 [ ] Testar contra os proprios exemplos do Anexo I fornecidos pela professora.
 [ ] Utilizar os nomes de modulos sugeridos no documento (nextToken / obterToken).
 */
@@ -473,6 +909,7 @@ void analisadorSintatico(FILE *arq) {
     iniciarAnalisador(arq);
 
     nextToken(); // Carrega o primeiro token (lookahead)
+    algoritmo();
 
     while (tokenAtual.type != TOKEN_EOF) {
         printf("[Parser Lookahead] Linha %d | Type: %d\n", tokenAtual.line, tokenAtual.type);
@@ -481,3 +918,47 @@ void analisadorSintatico(FILE *arq) {
 
     fecharAnalisador();
 }
+
+// esse main() aqui é só pra eu conseguir testar se o lexico tá funcionando.
+// ainda não é a versão final (falta formatar do jeito que o item 5 pede
+// e salvar num arquivo de log)
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
+        return 1;
+    }
+
+    FILE *arq = fopen(argv[1], "r");
+    if (arq == NULL) {
+        fprintf(stderr, "Nao foi possivel abrir o arquivo: %s\n", argv[1]);
+        return 1;
+    }
+
+    analisadorSintatico(arq);
+
+    return 0;
+}
+
+// int main(int argc, char *argv[]) {
+//     if (argc < 2) {
+//         fprintf(stderr, "Uso: %s <arquivo-fonte>\n", argv[0]);
+//         return 1;
+//     }
+
+//     FILE *arq = fopen(argv[1], "r");
+//     if (arq == NULL) {
+//         fprintf(stderr, "Nao foi possivel abrir o arquivo: %s\n", argv[1]);
+//         return 1;
+//     }
+
+//     iniciarAnalisador(arq);
+
+//     Token t;
+//     do {
+//         t = proximoToken();
+//         printf("linha %d -> type=%d\n", t.line, t.type); // saida crua so pra eu testar, nao e o formato final
+//     } while (t.type != TOKEN_EOF);
+
+//     fecharAnalisador();
+//     return 0;
+// }
